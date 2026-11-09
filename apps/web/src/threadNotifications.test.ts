@@ -102,3 +102,55 @@ describe("playNotificationSound", () => {
     expect(audio.started).toBe(1);
   });
 });
+
+describe("playNotificationAlert", () => {
+  it("speaks with, instead of, or not at all beside the sound, and never when sound is off", async () => {
+    const spoken: Array<string> = [];
+    vi.stubGlobal(
+      "SpeechSynthesisUtterance",
+      class {
+        constructor(readonly text: string) {}
+      },
+    );
+    vi.stubGlobal("speechSynthesis", {
+      speak: (u: { text: string }) => spoken.push(u.text),
+      getVoices: () => [],
+    });
+    vi.useFakeTimers();
+    const { playNotificationAlert } = await loadUnlocked();
+
+    playNotificationAlert("completion", "muted", () => ({
+      notificationMode: "notifications",
+      notificationSpeechMode: "instead-of-sound",
+      notificationSpeechVoice: "",
+    }));
+    playNotificationAlert("input", "instead", () => ({
+      notificationMode: "sound",
+      notificationSpeechMode: "instead-of-sound",
+      notificationSpeechVoice: "",
+    }));
+    await vi.runAllTimersAsync();
+    expect(audio.started).toBe(0);
+    expect(spoken).toEqual(["instead"]);
+
+    playNotificationAlert("completion", "silent", () => ({
+      notificationMode: "sound",
+      notificationSpeechMode: "off",
+      notificationSpeechVoice: "",
+    }));
+    await vi.runAllTimersAsync();
+    expect(audio.started).toBe(1);
+    expect(spoken).toEqual(["instead"]);
+
+    audio.currentTime = SOUND_SECONDS;
+    playNotificationAlert("completion", "after", () => ({
+      notificationMode: "notifications-and-sound",
+      notificationSpeechMode: "with-sound",
+      notificationSpeechVoice: "",
+    }));
+    await vi.runAllTimersAsync();
+    expect(audio.started).toBe(2);
+    expect(spoken).toEqual(["instead", "after"]);
+    vi.useRealTimers();
+  });
+});

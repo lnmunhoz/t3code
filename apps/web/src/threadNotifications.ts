@@ -1,6 +1,7 @@
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import type { ClientSettings } from "@t3tools/contracts/settings";
 
+import { canSpeakNotifications, speakNotification } from "./notificationSpeech";
 import completionUrl from "./assets/notification-completion.mp3";
 import inputUrl from "./assets/notification-input.mp3";
 
@@ -112,24 +113,60 @@ export function unlockNotificationAudio() {
   }
 }
 
+/** Resolves with how long the started sound lasts, in seconds, or 0 when nothing played. */
 export async function playNotificationSound(
   kind: "completion" | "input",
   shouldPlay: () => boolean,
-) {
-  if (!audioContext || audioContext.state !== "running") return;
+): Promise<number> {
+  if (!audioContext || audioContext.state !== "running") return 0;
   const context = audioContext;
   const url = kind === "completion" ? completionUrl : inputUrl;
   try {
     const decoded = await loadNotificationBuffer(context, url);
-    if (!shouldPlay() || context.state !== "running") return;
+    if (!shouldPlay() || context.state !== "running") return 0;
     // Coalesce same-sound bursts after decode to avoid clipping; input and completion alerts keep separate slots.
-    if (context.currentTime < (playingUntil.get(url) ?? 0)) return;
+    if (context.currentTime < (playingUntil.get(url) ?? 0)) return 0;
     const source = context.createBufferSource();
     source.buffer = decoded;
     source.connect(context.destination);
     source.start();
     playingUntil.set(url, context.currentTime + decoded.duration);
+    return decoded.duration;
   } catch {
     // A failed load is retried on the next alert.
+    return 0;
   }
+}
+
+type AlertSettings = Pick<
+  ClientSettings,
+  "notificationMode" | "notificationSpeechMode" | "notificationSpeechVoice"
+>;
+
+/**
+ * The audible half of an alert: the chime, the spoken text, or the chime then the text.
+ * Speech rides on the sound modes so muting sound also mutes speech.
+ */
+export function playNotificationAlert(
+  kind: "completion" | "input",
+  speech: string,
+  getSettings: () => AlertSettings,
+) {
+  const { notificationMode, notificationSpeechMode, notificationSpeechVoice } = getSettings();
+  if (!hasNotificationSound(notificationMode)) return;
+  const speak = notificationSpeechMode !== "off" && canSpeakNotifications();
+  const stillAudible = () => hasNotificationSound(getSettings().notificationMode);
+  if (speak && notificationSpeechMode === "instead-of-sound") {
+    speakNotification(speech, notificationSpeechVoice);
+    return;
+  }
+  void playNotificationSound(kind, stillAudible).then((seconds) => {
+    if (!speak) return;
+    setTimeout(() => {
+      const latest = getSettings();
+      if (stillAudible() && latest.notificationSpeechMode !== "off") {
+        speakNotification(speech, latest.notificationSpeechVoice);
+      }
+    }, seconds * 1000);
+  });
 }

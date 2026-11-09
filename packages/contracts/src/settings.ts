@@ -275,6 +275,10 @@ export const NotificationMode = Schema.Literals([
 ]);
 export type NotificationMode = typeof NotificationMode.Type;
 
+/** Whether alert sounds also speak the thread title, after the chime or in place of it. */
+export const NotificationSpeechMode = Schema.Literals(["off", "with-sound", "instead-of-sound"]);
+export type NotificationSpeechMode = typeof NotificationSpeechMode.Type;
+
 export const QuitConfirmationMode = Schema.Literals(["direct", "hold", "double-click"]);
 export type QuitConfirmationMode = typeof QuitConfirmationMode.Type;
 const DEFAULT_QUIT_CONFIRMATION_MODE: QuitConfirmationMode = "hold";
@@ -391,6 +395,11 @@ export const ClientSettingsSchema = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed("off" as const)),
   ),
   inAppNotificationsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  notificationSpeechMode: NotificationSpeechMode.pipe(
+    Schema.withDecodingDefault(Effect.succeed("with-sound" as const)),
+  ),
+  /** A SpeechSynthesisVoice voiceURI on this device; empty picks a sensible default voice. */
+  notificationSpeechVoice: Schema.String.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   diffColorScheme: DiffColorScheme.pipe(
     Schema.withDecodingDefault(Effect.succeed("red-green" as const)),
   ),
@@ -1976,6 +1985,8 @@ export function requiredScopesForProjectMutation(
 export const ClientSettingsPatch = Schema.Struct({
   notificationMode: Schema.optionalKey(NotificationMode),
   inAppNotificationsEnabled: Schema.optionalKey(Schema.Boolean),
+  notificationSpeechMode: Schema.optionalKey(NotificationSpeechMode),
+  notificationSpeechVoice: Schema.optionalKey(Schema.String),
   diffColorScheme: Schema.optionalKey(DiffColorScheme),
   chatWidth: Schema.optionalKey(ChatWidth),
   effortDisplay: Schema.optionalKey(EffortDisplay),

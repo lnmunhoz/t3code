@@ -309,6 +309,7 @@ describe("ClientSettings notifications", () => {
     expect(decodeClientSettings({}).inAppNotificationsEnabled).toBe(false);
     expect(decodeClientSettingsPatch({})).not.toHaveProperty("inAppNotificationsEnabled");
     expect(decodeClientSettingsPatch({})).not.toHaveProperty("notificationMode");
+    expect(decodeClientSettings({}).notificationSpeechMode).toBe("with-sound");
   });
 });
 
