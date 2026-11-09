@@ -6,6 +6,9 @@
 
 <h1 align="center">T3 Code</h1>
 
+> [!NOTE]
+> This is a personal, customized fork of [T3 Code](https://github.com/pingdotgg/t3code). Every change from upstream, with its date and motivation, is recorded in [CUSTOMIZATIONS.md](CUSTOMIZATIONS.md).
+
 <p align="center">The open-source control plane for coding agents.</p>
 
 <p align="center">
