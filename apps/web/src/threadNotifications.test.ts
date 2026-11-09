@@ -1,3 +1,4 @@
+import { DEFAULT_CLIENT_SETTINGS } from "@t3tools/contracts/settings";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 const SOUND_SECONDS = 0.6;
@@ -120,23 +121,23 @@ describe("playNotificationAlert", () => {
     const { playNotificationAlert } = await loadUnlocked();
 
     playNotificationAlert("completion", "muted", () => ({
+      ...DEFAULT_CLIENT_SETTINGS,
       notificationMode: "notifications",
       notificationSpeechMode: "instead-of-sound",
-      notificationSpeechVoice: "",
     }));
     playNotificationAlert("input", "instead", () => ({
+      ...DEFAULT_CLIENT_SETTINGS,
       notificationMode: "sound",
       notificationSpeechMode: "instead-of-sound",
-      notificationSpeechVoice: "",
     }));
     await vi.runAllTimersAsync();
     expect(audio.started).toBe(0);
     expect(spoken).toEqual(["instead"]);
 
     playNotificationAlert("completion", "silent", () => ({
+      ...DEFAULT_CLIENT_SETTINGS,
       notificationMode: "sound",
       notificationSpeechMode: "off",
-      notificationSpeechVoice: "",
     }));
     await vi.runAllTimersAsync();
     expect(audio.started).toBe(1);
@@ -144,9 +145,9 @@ describe("playNotificationAlert", () => {
 
     audio.currentTime = SOUND_SECONDS;
     playNotificationAlert("completion", "after", () => ({
+      ...DEFAULT_CLIENT_SETTINGS,
       notificationMode: "notifications-and-sound",
       notificationSpeechMode: "with-sound",
-      notificationSpeechVoice: "",
     }));
     await vi.runAllTimersAsync();
     expect(audio.started).toBe(2);

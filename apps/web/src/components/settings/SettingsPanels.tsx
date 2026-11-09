@@ -492,6 +492,16 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(settings.notificationSpeechVoice !== DEFAULT_UNIFIED_SETTINGS.notificationSpeechVoice
       ? ["Notification voice"]
       : []),
+    ...(settings.notificationSpeechEngine !== DEFAULT_UNIFIED_SETTINGS.notificationSpeechEngine
+      ? ["Voice engine"]
+      : []),
+    ...(settings.notificationSpeechKokoroVoice !==
+    DEFAULT_UNIFIED_SETTINGS.notificationSpeechKokoroVoice
+      ? ["Kokoro voice"]
+      : []),
+    ...(settings.notificationSpeechRate !== DEFAULT_UNIFIED_SETTINGS.notificationSpeechRate
+      ? ["Speech rate"]
+      : []),
     ...(settings.sidebarProjectGroupingMode !== DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode
       ? ["Project Grouping"]
       : []),
@@ -655,6 +665,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       inAppNotificationsEnabled: DEFAULT_UNIFIED_SETTINGS.inAppNotificationsEnabled,
       notificationSpeechMode: DEFAULT_UNIFIED_SETTINGS.notificationSpeechMode,
       notificationSpeechVoice: DEFAULT_UNIFIED_SETTINGS.notificationSpeechVoice,
+      notificationSpeechEngine: DEFAULT_UNIFIED_SETTINGS.notificationSpeechEngine,
+      notificationSpeechKokoroVoice: DEFAULT_UNIFIED_SETTINGS.notificationSpeechKokoroVoice,
+      notificationSpeechRate: DEFAULT_UNIFIED_SETTINGS.notificationSpeechRate,
       wordWrap: DEFAULT_UNIFIED_SETTINGS.wordWrap,
       persistComposerContextStrip: DEFAULT_UNIFIED_SETTINGS.persistComposerContextStrip,
       diffFilesCollapsed: DEFAULT_UNIFIED_SETTINGS.diffFilesCollapsed,

@@ -148,7 +148,7 @@
       "generatedNotices": [
         {
           "licenseId": "Apache-2.0",
-          "copyrights": ["Copyright 2009, 2010, 2013 Andr\u00e9 Berg"]
+          "copyrights": ["Copyright 2009, 2010, 2013 André Berg"]
         }
       ]
     },
@@ -321,7 +321,9 @@
       "version": "0.4.0",
       "license": "Apache-2.0 AND OFL-1.1",
       "generatedNotices": [
-        { "licenseId": "Apache-2.0" },
+        {
+          "licenseId": "Apache-2.0"
+        },
         {
           "licenseId": "OFL-1.1",
           "copyrights": [
@@ -841,6 +843,51 @@
       "name": "iobuffer",
       "license": "MIT",
       "sourceUrl": "https://github.com/image-js/iobuffer"
+    },
+    {
+      "name": "onnxruntime-web",
+      "license": "MIT",
+      "sourceUrl": "https://github.com/microsoft/onnxruntime",
+      "generatedNotice": {
+        "licenseId": "MIT",
+        "copyrights": ["Copyright (c) Microsoft Corporation. All rights reserved."]
+      }
+    },
+    {
+      "name": "onnxruntime-common",
+      "license": "MIT",
+      "sourceUrl": "https://github.com/microsoft/onnxruntime",
+      "generatedNotice": {
+        "licenseId": "MIT",
+        "copyrights": ["Copyright (c) Microsoft Corporation. All rights reserved."]
+      }
+    },
+    {
+      "name": "onnxruntime-node",
+      "license": "MIT",
+      "sourceUrl": "https://github.com/microsoft/onnxruntime",
+      "generatedNotice": {
+        "licenseId": "MIT",
+        "copyrights": ["Copyright (c) Microsoft Corporation. All rights reserved."]
+      }
+    },
+    {
+      "name": "guid-typescript",
+      "license": "ISC",
+      "sourceUrl": "https://github.com/NicolasDeveloper/guid-typescript",
+      "generatedNotice": {
+        "licenseId": "ISC",
+        "copyrights": ["Copyright (c) Nicolas Gomes"]
+      }
+    },
+    {
+      "name": "@img/sharp-libvips-darwin-arm64",
+      "license": "LGPL-3.0-or-later",
+      "sourceUrl": "https://github.com/lovell/sharp-libvips",
+      "generatedNotice": {
+        "licenseId": "LGPL-3.0-or-later",
+        "copyrights": ["Copyright (c) Lovell Fuller and contributors"]
+      }
     }
   ]
 }

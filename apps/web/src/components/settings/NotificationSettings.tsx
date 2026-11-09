@@ -1,20 +1,32 @@
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
 import { useState, useSyncExternalStore } from "react";
 
-import type { NotificationSpeechMode } from "@t3tools/contracts/settings";
+import type { ClientSettings, NotificationSpeechMode } from "@t3tools/contracts/settings";
 
+import { getClientSettings } from "../../hooks/useSettings";
 import {
   canSpeakNotifications,
   listSpeechVoices,
   speakNotification,
+  speechOptionsFromSettings,
   subscribeSpeechVoices,
 } from "../../notificationSpeech";
+import {
+  getKokoroDownloaded,
+  getKokoroState,
+  KOKORO_DOWNLOAD_LABEL,
+  KOKORO_VOICES,
+  loadKokoro,
+  removeKokoro,
+  subscribeKokoroState,
+} from "../../speech/kokoroSpeech";
 import {
   hasDesktopNotifications,
   hasNotificationSound,
   NOTIFICATION_MODE_LABELS,
   unlockNotificationAudio,
 } from "../../threadNotifications";
+import { Button } from "../ui/button";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { SettingsRow } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
@@ -122,7 +134,7 @@ export function NotificationSpeechSettings() {
           onValueChange={(value) => {
             if (!isSpeechMode(value)) return;
             updateSettings({ notificationSpeechMode: value });
-            if (value !== "off") speakNotification("Spoken notifications on");
+            if (value !== "off") previewSpeech({ notificationSpeechMode: value });
           }}
         >
           <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Spoken notifications">
@@ -141,14 +153,79 @@ export function NotificationSpeechSettings() {
   );
 }
 
+/** Engine, voice, model download, and rate rows; hidden while speech is off. */
+export function NotificationSpeechVoiceSettings() {
+  const speechOn = useScopedSettings((settings) => settings.notificationSpeechMode !== "off");
+  const engine = useScopedSettings((settings) => settings.notificationSpeechEngine);
+  const updateSettings = useUpdateScopedSettings();
+  if (!canSpeakNotifications() || !speechOn) return null;
+
+  return (
+    <>
+      <SettingsRow
+        {...searchableSetting("spoken-notification-engine")}
+        description={`System voices are built into this device. Kokoro is a neural voice that runs locally; it downloads once (${KOKORO_DOWNLOAD_LABEL}) and stays offline afterwards.`}
+        control={
+          <Select
+            value={engine}
+            onValueChange={(value) => {
+              if (value !== "system" && value !== "kokoro") return;
+              updateSettings({ notificationSpeechEngine: value });
+              if (value === "kokoro") {
+                void loadKokoro()
+                  .then(() => previewSpeech({ notificationSpeechEngine: "kokoro" }))
+                  .catch(() => undefined);
+              } else {
+                previewSpeech({ notificationSpeechEngine: "system" });
+              }
+            }}
+          >
+            <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Voice engine">
+              <SelectValue>{SPEECH_ENGINE_LABELS[engine]}</SelectValue>
+            </SelectTrigger>
+            <SelectPopup align="end" alignItemWithTrigger={false}>
+              {Object.entries(SPEECH_ENGINE_LABELS).map(([value, label]) => (
+                <SelectItem key={value} hideIndicator value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
+        }
+      />
+      {engine === "kokoro" ? (
+        <>
+          <KokoroModelRow />
+          <KokoroVoiceRow />
+        </>
+      ) : (
+        <SystemVoiceRow />
+      )}
+      <SpeechRateRow />
+    </>
+  );
+}
+
+const SPEECH_ENGINE_LABELS = {
+  system: "System voices",
+  kokoro: "Kokoro (neural, local)",
+} satisfies Record<ClientSettings["notificationSpeechEngine"], string>;
+
+const SPEECH_RATES = [0.8, 0.9, 1, 1.1, 1.25, 1.5] as const;
+
+function previewSpeech(patch: Partial<ClientSettings>) {
+  speakNotification(
+    "Thread complete",
+    speechOptionsFromSettings({ ...getClientSettings(), ...patch }),
+  );
+}
+
 const DEFAULT_VOICE = "default";
 
-export function NotificationSpeechVoiceSettings() {
+function SystemVoiceRow() {
   const voiceURI = useScopedSettings((settings) => settings.notificationSpeechVoice);
-  const speechOn = useScopedSettings((settings) => settings.notificationSpeechMode !== "off");
   const updateSettings = useUpdateScopedSettings();
   const voices = useSyncExternalStore(subscribeSpeechVoices, listSpeechVoices);
-  if (!canSpeakNotifications() || !speechOn) return null;
   // The full macOS list is long; show voices in the app's language plus the current pick.
   const language = (navigator.language || "en").split("-")[0]!;
   const shown = voices
@@ -167,7 +244,7 @@ export function NotificationSpeechVoiceSettings() {
             if (typeof value !== "string") return;
             const next = value === DEFAULT_VOICE ? "" : value;
             updateSettings({ notificationSpeechVoice: next });
-            speakNotification("Thread complete", next);
+            previewSpeech({ notificationSpeechVoice: next });
           }}
         >
           <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Notification voice">
@@ -180,6 +257,128 @@ export function NotificationSpeechVoiceSettings() {
             {shown.map((voice) => (
               <SelectItem key={voice.voiceURI} hideIndicator value={voice.voiceURI}>
                 {voice.name}
+              </SelectItem>
+            ))}
+          </SelectPopup>
+        </Select>
+      }
+    />
+  );
+}
+
+function KokoroModelRow() {
+  const state = useSyncExternalStore(subscribeKokoroState, getKokoroState);
+  const downloaded = useSyncExternalStore(subscribeKokoroState, getKokoroDownloaded);
+
+  const description =
+    state.status === "loading"
+      ? state.progress === null
+        ? "Loading the Kokoro model…"
+        : `Downloading the Kokoro model… ${Math.round(state.progress * 100)}%`
+      : state.status === "error"
+        ? `Kokoro failed to load: ${state.message}. Alerts use the system voice until it works.`
+        : downloaded
+          ? state.status === "ready"
+            ? "Downloaded and loaded. It unloads after 10 idle minutes to free memory."
+            : "Downloaded. It loads on the next alert."
+          : `Not downloaded yet (${KOKORO_DOWNLOAD_LABEL}). Alerts use the system voice until it is.`;
+
+  return (
+    <SettingsRow
+      {...searchableSetting("spoken-notification-kokoro-model")}
+      description={description}
+      control={
+        downloaded && state.status !== "loading" ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              void removeKokoro();
+            }}
+          >
+            Remove download
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={state.status === "loading"}
+            onClick={() => {
+              void loadKokoro()
+                .then(() => previewSpeech({ notificationSpeechEngine: "kokoro" }))
+                .catch(() => undefined);
+            }}
+          >
+            {state.status === "error" ? "Retry download" : "Download"}
+          </Button>
+        )
+      }
+    />
+  );
+}
+
+function KokoroVoiceRow() {
+  const voice = useScopedSettings((settings) => settings.notificationSpeechKokoroVoice);
+  const updateSettings = useUpdateScopedSettings();
+  const selected = KOKORO_VOICES.find((entry) => entry.id === voice);
+
+  return (
+    <SettingsRow
+      {...searchableSetting("spoken-notification-kokoro-voice")}
+      description="The Kokoro voice used for spoken alerts."
+      control={
+        <Select
+          value={voice}
+          onValueChange={(value) => {
+            if (typeof value !== "string") return;
+            updateSettings({ notificationSpeechKokoroVoice: value });
+            previewSpeech({
+              notificationSpeechEngine: "kokoro",
+              notificationSpeechKokoroVoice: value,
+            });
+          }}
+        >
+          <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Kokoro voice">
+            <SelectValue>{selected?.label ?? voice}</SelectValue>
+          </SelectTrigger>
+          <SelectPopup align="end" alignItemWithTrigger={false}>
+            {KOKORO_VOICES.map((entry) => (
+              <SelectItem key={entry.id} hideIndicator value={entry.id}>
+                {entry.label}
+              </SelectItem>
+            ))}
+          </SelectPopup>
+        </Select>
+      }
+    />
+  );
+}
+
+function SpeechRateRow() {
+  const rate = useScopedSettings((settings) => settings.notificationSpeechRate);
+  const updateSettings = useUpdateScopedSettings();
+
+  return (
+    <SettingsRow
+      {...searchableSetting("spoken-notification-rate")}
+      description="How fast alerts are spoken."
+      control={
+        <Select
+          value={String(rate)}
+          onValueChange={(value) => {
+            const next = Number(value);
+            if (!Number.isFinite(next)) return;
+            updateSettings({ notificationSpeechRate: next });
+            previewSpeech({ notificationSpeechRate: next });
+          }}
+        >
+          <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Speech rate">
+            <SelectValue>{`${rate}×`}</SelectValue>
+          </SelectTrigger>
+          <SelectPopup align="end" alignItemWithTrigger={false}>
+            {SPEECH_RATES.map((value) => (
+              <SelectItem key={value} hideIndicator value={String(value)}>
+                {`${value}×`}
               </SelectItem>
             ))}
           </SelectPopup>

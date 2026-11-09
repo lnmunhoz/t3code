@@ -328,6 +328,11 @@ export default defineConfig(() => {
           "./src/components/files/office/fonts-cjk.ts",
           import.meta.url,
         ).pathname,
+        // Transformers.js does not export its ONNX runtime files; the Kokoro worker serves them itself.
+        "@t3-onnx-runtime": new URL(
+          "./node_modules/@huggingface/transformers/dist",
+          import.meta.url,
+        ).pathname,
       },
       dedupe: ["react", "react-dom"],
     },

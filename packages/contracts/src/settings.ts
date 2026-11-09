@@ -279,6 +279,10 @@ export type NotificationMode = typeof NotificationMode.Type;
 export const NotificationSpeechMode = Schema.Literals(["off", "with-sound", "instead-of-sound"]);
 export type NotificationSpeechMode = typeof NotificationSpeechMode.Type;
 
+/** "system" uses the OS voices; "kokoro" runs the Kokoro-82M neural model on this device. */
+export const NotificationSpeechEngine = Schema.Literals(["system", "kokoro"]);
+export type NotificationSpeechEngine = typeof NotificationSpeechEngine.Type;
+
 export const QuitConfirmationMode = Schema.Literals(["direct", "hold", "double-click"]);
 export type QuitConfirmationMode = typeof QuitConfirmationMode.Type;
 const DEFAULT_QUIT_CONFIRMATION_MODE: QuitConfirmationMode = "hold";
@@ -400,6 +404,13 @@ export const ClientSettingsSchema = Schema.Struct({
   ),
   /** A SpeechSynthesisVoice voiceURI on this device; empty picks a sensible default voice. */
   notificationSpeechVoice: Schema.String.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  notificationSpeechEngine: NotificationSpeechEngine.pipe(
+    Schema.withDecodingDefault(Effect.succeed("system" as const)),
+  ),
+  notificationSpeechKokoroVoice: Schema.String.pipe(
+    Schema.withDecodingDefault(Effect.succeed("af_heart")),
+  ),
+  notificationSpeechRate: Schema.Number.pipe(Schema.withDecodingDefault(Effect.succeed(1))),
   diffColorScheme: DiffColorScheme.pipe(
     Schema.withDecodingDefault(Effect.succeed("red-green" as const)),
   ),
@@ -1987,6 +1998,9 @@ export const ClientSettingsPatch = Schema.Struct({
   inAppNotificationsEnabled: Schema.optionalKey(Schema.Boolean),
   notificationSpeechMode: Schema.optionalKey(NotificationSpeechMode),
   notificationSpeechVoice: Schema.optionalKey(Schema.String),
+  notificationSpeechEngine: Schema.optionalKey(NotificationSpeechEngine),
+  notificationSpeechKokoroVoice: Schema.optionalKey(Schema.String),
+  notificationSpeechRate: Schema.optionalKey(Schema.Number),
   diffColorScheme: Schema.optionalKey(DiffColorScheme),
   chatWidth: Schema.optionalKey(ChatWidth),
   effortDisplay: Schema.optionalKey(EffortDisplay),

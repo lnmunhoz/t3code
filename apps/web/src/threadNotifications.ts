@@ -1,7 +1,11 @@
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import type { ClientSettings } from "@t3tools/contracts/settings";
 
-import { canSpeakNotifications, speakNotification } from "./notificationSpeech";
+import {
+  canSpeakNotifications,
+  speakNotification,
+  speechOptionsFromSettings,
+} from "./notificationSpeech";
 import completionUrl from "./assets/notification-completion.mp3";
 import inputUrl from "./assets/notification-input.mp3";
 
@@ -138,11 +142,6 @@ export async function playNotificationSound(
   }
 }
 
-type AlertSettings = Pick<
-  ClientSettings,
-  "notificationMode" | "notificationSpeechMode" | "notificationSpeechVoice"
->;
-
 /**
  * The audible half of an alert: the chime, the spoken text, or the chime then the text.
  * Speech rides on the sound modes so muting sound also mutes speech.
@@ -150,14 +149,15 @@ type AlertSettings = Pick<
 export function playNotificationAlert(
   kind: "completion" | "input",
   speech: string,
-  getSettings: () => AlertSettings,
+  getSettings: () => ClientSettings,
 ) {
-  const { notificationMode, notificationSpeechMode, notificationSpeechVoice } = getSettings();
+  const settings = getSettings();
+  const { notificationMode, notificationSpeechMode } = settings;
   if (!hasNotificationSound(notificationMode)) return;
   const speak = notificationSpeechMode !== "off" && canSpeakNotifications();
   const stillAudible = () => hasNotificationSound(getSettings().notificationMode);
   if (speak && notificationSpeechMode === "instead-of-sound") {
-    speakNotification(speech, notificationSpeechVoice);
+    speakNotification(speech, speechOptionsFromSettings(settings));
     return;
   }
   void playNotificationSound(kind, stillAudible).then((seconds) => {
@@ -165,7 +165,7 @@ export function playNotificationAlert(
     setTimeout(() => {
       const latest = getSettings();
       if (stillAudible() && latest.notificationSpeechMode !== "off") {
-        speakNotification(speech, latest.notificationSpeechVoice);
+        speakNotification(speech, speechOptionsFromSettings(latest));
       }
     }, seconds * 1000);
   });
