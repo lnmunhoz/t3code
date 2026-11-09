@@ -6,6 +6,12 @@ Each entry: date, title, what changed, and why.
 
 ---
 
+## 2026-11-09 — Auto-push to fork after each commit
+
+**What:** Added `.vite-hooks/post-commit`, which pushes `local/custom` to the `fork` remote in the background after every commit on that branch.
+
+**Why:** Keep the public fork in sync automatically instead of relying on remembering to push.
+
 ## 2026-11-09 — Customization log and fork tracking
 
 **What:** Added the "This is a custom fork" section to `AGENTS.md` and created this file. Created the public fork https://github.com/lnmunhoz/t3code, added it as the `fork` remote, and `local/custom` is pushed there after each commit.
