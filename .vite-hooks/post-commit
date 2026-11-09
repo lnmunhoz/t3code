@@ -1,0 +1,4 @@
+# Custom fork: mirror local/custom to the user's public fork after each commit (see CUSTOMIZATIONS.md).
+[ "$(git rev-parse --abbrev-ref HEAD)" = "local/custom" ] || exit 0
+git remote get-url fork >/dev/null 2>&1 || exit 0
+(git push -q fork local/custom >/dev/null 2>&1 || echo "post-commit: push to fork failed; run: git push fork local/custom" >&2) &

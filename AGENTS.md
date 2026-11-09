@@ -12,7 +12,7 @@ Every customization is recorded in [CUSTOMIZATIONS.md](CUSTOMIZATIONS.md) so we 
 
 - When you make a change for the user, add an entry to `CUSTOMIZATIONS.md` in the same commit: the date (YYYY-MM-DD), a short title, what changed (key files), and the user's motivation in their own terms. If the motivation is unclear, ask.
 - Append new entries at the top. Never delete or rewrite history; if a customization is reverted or replaced, add a new entry saying so and why.
-- Remotes: `origin` is upstream (`pingdotgg/t3code`, never push there); `fork` is the user's public fork (`lnmunhoz/t3code`). Keep the fork in sync: after committing to `local/custom`, run `git push fork local/custom`. When pulling upstream, also `git push fork main`.
+- Remotes: `origin` is upstream (`pingdotgg/t3code`, never push there); `fork` is the user's public fork (`lnmunhoz/t3code`). A `.vite-hooks/post-commit` hook pushes `local/custom` to `fork` after each commit; if it reports a failure, push manually. When pulling upstream, also `git push fork main`.
 - Customizations override the upstream-oriented guidance below where they conflict (for example, PRs and multi-surface coverage are not required unless the user asks).
 
 ## What makes T3 Code special?
