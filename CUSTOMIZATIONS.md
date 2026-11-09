@@ -6,6 +6,12 @@ Each entry: date, title, what changed, and why.
 
 ---
 
+## 2026-11-09 — Fork default branch is local/custom
+
+**What:** Set the default branch of https://github.com/lnmunhoz/t3code to `local/custom` (GitHub repo setting). The fork's `main` stays a plain mirror of upstream.
+
+**Why:** Visitors to the fork should land on the customized version, not a copy of upstream.
+
 ## 2026-11-09 — Auto-push to fork after each commit
 
 **What:** Added `.vite-hooks/post-commit`, which pushes `local/custom` to the `fork` remote in the background after every commit on that branch.
