@@ -37,6 +37,12 @@ export type KokoroState =
   | { readonly status: "error"; readonly message: string };
 
 let state: KokoroState = { status: "idle" };
+
+/** ONNX runtime errors can embed whole modules; keep the first line, capped. */
+function shortError(message: string): string {
+  const line = message.split("\n")[0] ?? message;
+  return line.length > 160 ? `${line.slice(0, 157)}…` : line;
+}
 const listeners = new Set<() => void>();
 
 function setState(next: KokoroState) {
@@ -137,7 +143,7 @@ export function loadKokoro(): Promise<void> {
           if (message.id === null) {
             reject(new Error(message.message));
             unload();
-            setState({ status: "error", message: message.message });
+            setState({ status: "error", message: shortError(message.message) });
             return;
           }
           pending.get(message.id)?.reject(new Error(message.message));
@@ -145,7 +151,7 @@ export function loadKokoro(): Promise<void> {
       }
     });
     instance.addEventListener("error", (event) => {
-      const message = event.message || "Kokoro worker failed to start";
+      const message = shortError(event.message || "Kokoro worker failed to start");
       reject(new Error(message));
       unload();
       setState({ status: "error", message });
