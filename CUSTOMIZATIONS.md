@@ -6,6 +6,12 @@ Each entry: date, title, what changed, and why.
 
 ---
 
+## 2026-11-09 — Fix Kokoro failing to load in dev
+
+**What:** `apps/web/src/speech/kokoro.worker.ts` now overrides only the ONNX runtime's `.wasm` path. Its `.mjs` glue is already embedded in the bundled runtime, and in Vite's bundled dev mode a `?url` import of that file returned its source text, so loading failed with "no available backend found". `apps/web/src/speech/kokoroSpeech.ts` also shortens load errors shown in Settings to one line.
+
+**Why:** Picking Kokoro in the dev app showed a huge "Kokoro failed to load" error in Settings.
+
 ## 2026-11-09 — Kokoro neural voice for spoken notifications
 
 **What:** Spoken notifications can use Kokoro-82M, a neural TTS model that runs locally in a Web Worker, as well as the system voices. Settings › General › Notifications gains a Voice engine picker (System voices / Kokoro), a Kokoro model row (download with progress, remove download), a Kokoro voice picker and a speech rate. The model downloads once from Hugging Face into the browser cache and runs on WebGPU in fp32 (~330 MB, ~0.3–0.6 s per alert on an M-series Mac), or on WASM q8 (~90 MB, 4–8 s) when no GPU adapter is available. It unloads after 10 idle minutes, and alerts fall back to the system voice whenever Kokoro cannot speak. This completes the "Local voice model dependency (kokoro-js)" work-in-progress entry below. Key files: `apps/web/src/speech/kokoro.worker.ts`, `apps/web/src/speech/kokoroSpeech.ts`, `apps/web/src/notificationSpeech.ts`, `apps/web/src/components/settings/NotificationSettings.tsx`, `packages/contracts/src/settings.ts`; `apps/web/vite.config.ts` aliases Transformers.js's ONNX runtime files so they are bundled instead of loaded from jsDelivr (blocked by the desktop CSP); `third-party-licenses.config.json` adds notices for the new transitive packages.

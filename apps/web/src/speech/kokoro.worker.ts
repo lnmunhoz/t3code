@@ -1,13 +1,14 @@
 import { env } from "@huggingface/transformers";
-import ortMjsUrl from "@t3-onnx-runtime/ort-wasm-simd-threaded.jsep.mjs?url";
 import ortWasmUrl from "@t3-onnx-runtime/ort-wasm-simd-threaded.jsep.wasm?url";
 import { KokoroTTS } from "kokoro-js";
 
 import type { KokoroWorkerRequest, KokoroWorkerResponse } from "./kokoroProtocol";
 
 // Transformers.js loads the ONNX runtime from jsDelivr by default, which the desktop CSP blocks.
+// Only the binary is overridden: the bundled runtime embeds its JS glue, and a `?url` import of
+// that .mjs comes back as source text in Vite's bundled dev mode.
 if (env.backends.onnx.wasm) {
-  env.backends.onnx.wasm.wasmPaths = { mjs: ortMjsUrl, wasm: ortWasmUrl };
+  env.backends.onnx.wasm.wasmPaths = { wasm: ortWasmUrl };
   env.backends.onnx.wasm.numThreads = 1;
 }
 
