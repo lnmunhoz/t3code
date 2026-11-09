@@ -744,6 +744,30 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("speech voice text to speech tts say announce read aloud completion")],
   },
   {
+    id: "spoken-notification-engine",
+    title: msg("Voice engine"),
+    to: "/settings/general",
+    searchTerms: [msg("speech tts kokoro neural local model system voice engine")],
+  },
+  {
+    id: "spoken-notification-kokoro-model",
+    title: msg("Kokoro model"),
+    to: "/settings/general",
+    searchTerms: [msg("kokoro neural tts model download remove offline")],
+  },
+  {
+    id: "spoken-notification-kokoro-voice",
+    title: msg("Kokoro voice"),
+    to: "/settings/general",
+    searchTerms: [msg("kokoro voice neural tts heart bella michael emma george")],
+  },
+  {
+    id: "spoken-notification-rate",
+    title: msg("Speech rate"),
+    to: "/settings/general",
+    searchTerms: [msg("speech rate speed fast slow tts voice")],
+  },
+  {
     id: "spoken-notification-voice",
     title: msg("Notification voice"),
     to: "/settings/general",

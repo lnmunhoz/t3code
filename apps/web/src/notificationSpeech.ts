@@ -1,8 +1,36 @@
-/** The seam where a cloud voice (ElevenLabs, OpenAI) can replace the built-in one later. */
-export interface NotificationSpeechProvider {
+import type { ClientSettings } from "@t3tools/contracts/settings";
+
+import { speakWithKokoro } from "./speech/kokoroSpeech";
+
+export interface SpeechOptions {
+  readonly engine: ClientSettings["notificationSpeechEngine"];
+  /** A SpeechSynthesisVoice voiceURI; "" picks a sensible default. */
+  readonly systemVoice: string;
+  readonly kokoroVoice: string;
+  readonly rate: number;
+}
+
+export function speechOptionsFromSettings(settings: ClientSettings): SpeechOptions {
+  return {
+    engine: settings.notificationSpeechEngine,
+    systemVoice: settings.notificationSpeechVoice,
+    kokoroVoice: settings.notificationSpeechKokoroVoice,
+    rate: settings.notificationSpeechRate,
+  };
+}
+
+const DEFAULT_OPTIONS: SpeechOptions = {
+  engine: "system",
+  systemVoice: "",
+  kokoroVoice: "af_heart",
+  rate: 1,
+};
+
+/** The seam for speech engines; a cloud voice (ElevenLabs, OpenAI) would be another one. */
+interface NotificationSpeechProvider {
   readonly available: () => boolean;
-  /** Resolves when the utterance ends or is dropped. `voice` is a provider-specific id; "" is the default. */
-  readonly speak: (text: string, voice: string) => Promise<void>;
+  /** Resolves when the utterance ends or is dropped; rejects when the engine cannot speak. */
+  readonly speak: (text: string, options: SpeechOptions) => Promise<void>;
 }
 
 // Chromium (and so Electron) on macOS often flags no default voice and falls back to the first one
@@ -46,10 +74,11 @@ function resolveVoice(voiceURI: string): SpeechSynthesisVoice | undefined {
 
 const webSpeechProvider: NotificationSpeechProvider = {
   available: () => typeof speechSynthesis !== "undefined",
-  speak: (text, voice) =>
+  speak: (text, options) =>
     new Promise((resolve) => {
       const utterance = new SpeechSynthesisUtterance(text);
-      const resolved = resolveVoice(voice);
+      utterance.rate = options.rate;
+      const resolved = resolveVoice(options.systemVoice);
       if (resolved) {
         utterance.voice = resolved;
         utterance.lang = resolved.lang;
@@ -66,10 +95,25 @@ const webSpeechProvider: NotificationSpeechProvider = {
     }),
 };
 
-const provider: NotificationSpeechProvider = webSpeechProvider;
+const kokoroProvider: NotificationSpeechProvider = {
+  available: () => typeof Worker !== "undefined" && typeof WebAssembly !== "undefined",
+  speak: (text, options) => speakWithKokoro(text, options.kokoroVoice, options.rate),
+};
+
+async function speakWith(text: string, options: SpeechOptions) {
+  if (options.engine === "kokoro" && kokoroProvider.available()) {
+    try {
+      await kokoroProvider.speak(text, options);
+      return;
+    } catch {
+      // Fall through to the system voice so an alert is never silent.
+    }
+  }
+  if (webSpeechProvider.available()) await webSpeechProvider.speak(text, options);
+}
 
 export function canSpeakNotifications() {
-  return provider.available();
+  return webSpeechProvider.available() || kokoroProvider.available();
 }
 
 const MAX_TITLE_CHARS = 60;
@@ -102,7 +146,7 @@ export function threadSpeechText(title: string, status: string): string {
 }
 
 // Announcements play one after another; bursts beyond the cap and repeats already waiting are dropped.
-const queue: Array<{ readonly text: string; readonly voice: string }> = [];
+const queue: Array<{ readonly text: string; readonly options: SpeechOptions }> = [];
 let draining = false;
 
 async function drain() {
@@ -111,7 +155,7 @@ async function drain() {
   try {
     while (queue.length > 0) {
       const next = queue[0]!;
-      await provider.speak(next.text, next.voice);
+      await speakWith(next.text, next.options);
       queue.shift();
     }
   } finally {
@@ -119,9 +163,9 @@ async function drain() {
   }
 }
 
-export function speakNotification(text: string, voice = "") {
-  if (!provider.available() || queue.length >= MAX_QUEUED) return;
+export function speakNotification(text: string, options: SpeechOptions = DEFAULT_OPTIONS) {
+  if (!canSpeakNotifications() || queue.length >= MAX_QUEUED) return;
   if (queue.some((entry) => entry.text === text)) return;
-  queue.push({ text, voice });
+  queue.push({ text, options });
   void drain();
 }

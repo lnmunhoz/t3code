@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
+const kokoro = vi.hoisted(() => ({ speak: vi.fn<() => Promise<void>>() }));
+vi.mock("./speech/kokoroSpeech", () => ({ speakWithKokoro: kokoro.speak }));
+
 const spoken: Array<{ text: string; onend: (() => void) | null }> = [];
 
 class FakeUtterance {
@@ -52,5 +55,27 @@ describe("speakNotification", () => {
     spoken.at(-1)!.onend!();
     await Promise.resolve();
     expect(spoken).toHaveLength(3);
+  });
+});
+
+describe("speakNotification with Kokoro", () => {
+  it("uses Kokoro when selected and falls back to the system voice when it fails", async () => {
+    vi.stubGlobal("Worker", function Worker() {});
+    kokoro.speak.mockReset();
+    kokoro.speak.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("offline"));
+    const { speakNotification } = await import("./notificationSpeech");
+    const options = {
+      engine: "kokoro",
+      systemVoice: "",
+      kokoroVoice: "af_heart",
+      rate: 1.2,
+    } as const;
+
+    speakNotification("neural", options);
+    await vi.waitFor(() => expect(kokoro.speak).toHaveBeenCalledWith("neural", "af_heart", 1.2));
+    expect(spoken).toHaveLength(0);
+
+    speakNotification("fallback", options);
+    await vi.waitFor(() => expect(spoken.map((utterance) => utterance.text)).toEqual(["fallback"]));
   });
 });
