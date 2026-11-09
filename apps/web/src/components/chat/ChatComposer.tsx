@@ -123,6 +123,7 @@ import {
   fileAttachmentCapabilityBlockReason,
   fileAttachmentStagingLimit,
   isPreviewableComposerVideo,
+  pastedTextBesideAttachments,
   shouldHandleComposerAttachmentPaste,
 } from "./composerAttachmentFiles";
 import {
@@ -2650,6 +2651,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (folders.length > 0) addComposerFoldersStable(folders);
       if (files.length > 0) {
         void addComposerAttachments(files, { skipImageInlineChip: bypassAutoAttachment });
+        // A prompt copied together with its screenshot keeps its text instead of losing it to the attachment.
+        const besideText = pastedTextBesideAttachments({ files, plainText });
+        if (besideText !== null && !foldPastedText(besideText, bypassAutoAttachment)) {
+          insertComposerText(besideText, "cursor");
+        }
       }
       return;
     }

@@ -162,6 +162,25 @@ export function attachmentsToReleaseOnUploadCapabilityLoss(
   );
 }
 
+/**
+ * Text that arrived in the same paste as image attachments, which the composer should insert as well.
+ * Apps such as Focus Dot Annotations copy a prompt together with its screenshot; Finder instead puts
+ * the copied files' names or paths beside them, which is not something to type into the prompt.
+ */
+export function pastedTextBesideAttachments(input: {
+  readonly files: ReadonlyArray<Pick<File, "name">>;
+  readonly plainText: string;
+}): string | null {
+  if (input.plainText.trim().length === 0) return null;
+  const names = new Set(input.files.map((file) => file.name));
+  const lines = input.plainText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const onlyFileNames = lines.every((line) => names.has(line.slice(line.lastIndexOf("/") + 1)));
+  return onlyFileNames ? null : input.plainText;
+}
+
 export function shouldHandleComposerAttachmentPaste(input: {
   readonly files: ReadonlyArray<File>;
   readonly plainText: string;

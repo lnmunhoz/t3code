@@ -6,6 +6,12 @@ Each entry: date, title, what changed, and why.
 
 ---
 
+## 2026-11-09 — Keep pasted text that comes with an image
+
+**What:** When a paste carries an image together with text, the composer now attaches the image and also inserts the text, instead of dropping the text. Finder's copied file names or paths are still ignored. `pastedTextBesideAttachments` in `apps/web/src/components/chat/composerAttachmentFiles.ts` decides which text to keep, and `onComposerPaste` in `apps/web/src/components/chat/ChatComposer.tsx` inserts it (long text still folds into an attachment as usual).
+
+**Why:** Copying an annotation from Focus Dot (a prompt with its marked-up screenshot) pasted only the image into T3 Code, while Claude Desktop kept both. Wanted T3 Code to accept the same format as Claude so the same Copy works in both.
+
 ## 2026-11-09 — Fix Kokoro failing to load in dev
 
 **What:** `apps/web/src/speech/kokoro.worker.ts` now overrides only the ONNX runtime's `.wasm` path. Its `.mjs` glue is already embedded in the bundled runtime, and in Vite's bundled dev mode a `?url` import of that file returned its source text, so loading failed with "no available backend found". `apps/web/src/speech/kokoroSpeech.ts` also shortens load errors shown in Settings to one line.

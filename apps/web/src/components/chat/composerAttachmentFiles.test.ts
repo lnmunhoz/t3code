@@ -14,6 +14,7 @@ import {
   fileAttachmentCapabilityBlockReason,
   fileAttachmentStagingLimit,
   normalizeComposerImageFileMimeType,
+  pastedTextBesideAttachments,
   shouldHandleComposerAttachmentPaste,
 } from "./composerAttachmentFiles";
 
@@ -190,5 +191,26 @@ describe("composer attachment files", () => {
     ]);
 
     expect(released.map((attachment) => attachment.id)).toEqual(["image-1", "file-uploading"]);
+  });
+
+  it("keeps text pasted together with an image, but not the file names Finder copies", () => {
+    const shot = { name: "image.png" };
+    expect(
+      pastedTextBesideAttachments({ files: [shot], plainText: "The footer overlaps the button" }),
+    ).toBe("The footer overlaps the button");
+    expect(pastedTextBesideAttachments({ files: [shot], plainText: "  \n" })).toBeNull();
+    expect(pastedTextBesideAttachments({ files: [shot], plainText: "" })).toBeNull();
+    expect(
+      pastedTextBesideAttachments({
+        files: [{ name: "a.png" }, { name: "b.png" }],
+        plainText: "a.png\nb.png",
+      }),
+    ).toBeNull();
+    expect(
+      pastedTextBesideAttachments({
+        files: [{ name: "a.png" }],
+        plainText: "/Users/me/Desktop/a.png",
+      }),
+    ).toBeNull();
   });
 });
