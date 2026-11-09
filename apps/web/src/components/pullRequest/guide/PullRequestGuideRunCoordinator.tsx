@@ -6,11 +6,7 @@ import { AsyncResult, type AtomRegistry } from "effect/reactivity";
 
 import { getClientSettings } from "~/hooks/useSettings";
 import { observedPullRequestTitle, pullRequestEnvironment } from "~/state/pullRequests";
-import {
-  hasDesktopNotifications,
-  hasNotificationSound,
-  playNotificationSound,
-} from "~/threadNotifications";
+import { hasDesktopNotifications, playNotificationAlert } from "~/threadNotifications";
 
 import { toastManager } from "../../ui/toast";
 import { readPullRequestListPreferences } from "../pullRequestListPreferences";
@@ -110,12 +106,7 @@ function watchGuideRun(
         },
       });
     };
-    const mode = getClientSettings().notificationMode;
-    if (hasNotificationSound(mode)) {
-      void playNotificationSound(failure === null ? "completion" : "input", () =>
-        hasNotificationSound(getClientSettings().notificationMode),
-      );
-    }
+    playNotificationAlert(failure === null ? "completion" : "input", title, getClientSettings);
     if (looking) {
       const toastId = toastManager.add({
         type: failure === null ? "success" : "error",
@@ -141,7 +132,7 @@ function watchGuideRun(
       return;
     }
     if (
-      !hasDesktopNotifications(mode) ||
+      !hasDesktopNotifications(getClientSettings().notificationMode) ||
       typeof Notification === "undefined" ||
       Notification.permission !== "granted"
     )

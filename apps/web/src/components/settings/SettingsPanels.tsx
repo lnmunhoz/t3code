@@ -1,7 +1,11 @@
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { m as resolveMessage } from "~/i18n/messages";
 import { useAtomValue } from "@effect/atom-react";
-import { NotificationSettings } from "./NotificationSettings";
+import {
+  NotificationSettings,
+  NotificationSpeechSettings,
+  NotificationSpeechVoiceSettings,
+} from "./NotificationSettings";
 import { PRIVACY_POLICY_URL } from "../../legalLinks";
 import { CheckIcon } from "lucide-react";
 import { msg, T, useGT, useMessages } from "gt-react";
@@ -523,6 +527,12 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(settings.inAppNotificationsEnabled !== DEFAULT_UNIFIED_SETTINGS.inAppNotificationsEnabled
       ? [gt("In-app notifications")]
       : []),
+    ...(settings.notificationSpeechMode !== DEFAULT_UNIFIED_SETTINGS.notificationSpeechMode
+      ? ["Spoken notifications"]
+      : []),
+    ...(settings.notificationSpeechVoice !== DEFAULT_UNIFIED_SETTINGS.notificationSpeechVoice
+      ? ["Notification voice"]
+      : []),
     ...(settings.sidebarProjectGroupingMode !== DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode
       ? [gt("Project Grouping")]
       : []),
@@ -703,6 +713,8 @@ export function useSettingsRestore(onRestored?: () => void) {
       timestampFormat: DEFAULT_UNIFIED_SETTINGS.timestampFormat,
       notificationMode: DEFAULT_UNIFIED_SETTINGS.notificationMode,
       inAppNotificationsEnabled: DEFAULT_UNIFIED_SETTINGS.inAppNotificationsEnabled,
+      notificationSpeechMode: DEFAULT_UNIFIED_SETTINGS.notificationSpeechMode,
+      notificationSpeechVoice: DEFAULT_UNIFIED_SETTINGS.notificationSpeechVoice,
       wordWrap: DEFAULT_UNIFIED_SETTINGS.wordWrap,
       persistComposerContextStrip: DEFAULT_UNIFIED_SETTINGS.persistComposerContextStrip,
       diffFilesCollapsed: DEFAULT_UNIFIED_SETTINGS.diffFilesCollapsed,
@@ -844,6 +856,8 @@ export function GeneralSettingsPanel() {
     <SettingsPageContainer>
       <SettingsSection id="notifications" title={gt("Notifications")}>
         <NotificationSettings />
+        <NotificationSpeechSettings />
+        <NotificationSpeechVoiceSettings />
         <SettingsRow
           {...setting("in-app-notifications")}
           description={

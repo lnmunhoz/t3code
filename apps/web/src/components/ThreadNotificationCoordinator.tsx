@@ -28,11 +28,12 @@ import { environmentThreadShells } from "../state/threads";
 import {
   hasDesktopNotifications,
   hasNotificationSound,
-  playNotificationSound,
+  playNotificationAlert,
   setNotificationBadge,
   threadNotificationTag,
   unlockNotificationAudio,
 } from "../threadNotifications";
+import { threadSpeechText } from "../notificationSpeech";
 import { resolveBackgroundThreadRequest } from "./backgroundThreadAnnouncement";
 import { resolveSidebarThreadStatus, type SidebarThreadStatus } from "./Sidebar.logic";
 import {
@@ -156,11 +157,11 @@ export function startThreadNotifications(
               : status === "request"
                 ? m(msg("Guest request"))
                 : m(msg("Input needed"));
-    if (hasNotificationSound(mode)) {
-      void playNotificationSound(kind, () =>
-        hasNotificationSound(getClientSettings().notificationMode),
-      );
-    }
+    playNotificationAlert(
+      kind,
+      threadSpeechText(thread.title, kind === "completion" ? "completion" : status),
+      getClientSettings,
+    );
     if (
       inAppNotificationsEnabled &&
       document.visibilityState === "visible" &&

@@ -738,6 +738,18 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("notification sound alert completion input approval desktop")],
   },
   {
+    id: "spoken-notifications",
+    title: msg("Spoken notifications"),
+    to: "/settings/general",
+    searchTerms: [msg("speech voice text to speech tts say announce read aloud completion")],
+  },
+  {
+    id: "spoken-notification-voice",
+    title: msg("Notification voice"),
+    to: "/settings/general",
+    searchTerms: [msg("speech voice tts text to speech system voice samantha")],
+  },
+  {
     id: "in-app-notifications",
     title: msg("In-app notifications"),
     to: "/settings/general",
