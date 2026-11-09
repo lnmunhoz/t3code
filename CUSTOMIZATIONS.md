@@ -6,6 +6,12 @@ Each entry: date, title, what changed, and why.
 
 ---
 
+## 2026-11-09 — README notes the fork
+
+**What:** Added a `[!NOTE]` alert under the `README.md` title saying this is a customized fork and linking here.
+
+**Why:** Anyone landing on the fork should immediately know it differs from upstream and where to see how.
+
 ## 2026-11-09 — Fork default branch is local/custom
 
 **What:** Set the default branch of https://github.com/lnmunhoz/t3code to `local/custom` (GitHub repo setting). The fork's `main` stays a plain mirror of upstream.
