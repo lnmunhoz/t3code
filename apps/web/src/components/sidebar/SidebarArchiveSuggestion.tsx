@@ -113,7 +113,6 @@ export function SidebarArchiveSuggestion(props: {
     const archivedKeys = new Set<string>();
     const failedKeys = new Set<string>();
     let streak = 0;
-    let lastHit = -1;
     let firstError: unknown = null;
     setRun({
       items: targets,
@@ -134,8 +133,7 @@ export function SidebarArchiveSuggestion(props: {
         }
       } else {
         archivedKeys.add(key);
-        player?.hit(streak);
-        lastHit = streak;
+        player?.hit(streak, index === targets.length - 1);
         streak += 1;
       }
       setRun({
@@ -149,7 +147,6 @@ export function SidebarArchiveSuggestion(props: {
         comboStepDelayMs(comboSettings.stepMs, index) - (performance.now() - startedAt);
       if (index < targets.length - 1 && remaining > 0) await wait(remaining);
     }
-    if (lastHit >= 0) player?.finale(lastHit);
     setRun({ items: targets, archivedKeys, failedKeys, streak, finished: true });
     if (firstError !== null) {
       toastManager.add(

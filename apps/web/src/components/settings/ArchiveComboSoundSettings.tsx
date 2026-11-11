@@ -169,13 +169,13 @@ export function ArchiveComboSoundSettings() {
             }
           />
           <NestedRow
-            title="Fanfare"
-            description="Finish the combo with a short rising flourish."
+            title="Finishing chord"
+            description="Play the last archive as a bright chord instead of a single note."
             control={
               <Switch
                 checked={settings.finale}
                 onCheckedChange={(checked) => save({ ...settings, finale: Boolean(checked) })}
-                aria-label="Combo fanfare"
+                aria-label="Finishing chord"
               />
             }
           />
