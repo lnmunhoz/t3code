@@ -276,6 +276,7 @@ import {
   type SidebarProviderEntry,
   type SidebarSweepAction,
 } from "./sidebar/SidebarThreadRow";
+import { SidebarArchiveSuggestion } from "./sidebar/SidebarArchiveSuggestion";
 import { SidebarDraftBlock, useSidebarDrafts } from "./sidebar/SidebarDraftBlock";
 import {
   SidebarProjectFolderHeader,
@@ -1323,6 +1324,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     snoozedThreads,
     settledThreads,
     snoozeNow,
+    visibleThreads,
     searchableThreads,
     settledVisibleCount,
     settledCount,
@@ -3609,6 +3611,14 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       };
                       const from = isContextDrag ? null : (dragState?.activeSection ?? null);
                       const items: ReactNode[] = [
+                        <SidebarArchiveSuggestion
+                          key="archive-suggestion"
+                          threads={visibleThreads}
+                          allThreads={threads}
+                          routeThreadKey={routeThreadKey}
+                          projectByKey={projectByKey}
+                          onOpen={navigateToThread}
+                        />,
                         <SidebarDraftBlock
                           key="draft-sessions"
                           draftIds={draftIds}
