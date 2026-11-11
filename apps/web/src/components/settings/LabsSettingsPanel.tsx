@@ -6,6 +6,7 @@ import { hasCloudPublicConfig } from "~/cloud/publicConfig";
 import { useT3ConnectAuthPrompt } from "../clerk/useT3ConnectAuthPrompt";
 import { Button } from "../ui/button";
 import { ArchiveComboSoundSettings } from "./ArchiveComboSoundSettings";
+import { ArchiveSuggestionSettings } from "./ArchiveSuggestionSettings";
 import { Switch } from "../ui/switch";
 import { ScopedSwitch } from "./ScopedSwitch";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
@@ -26,6 +27,9 @@ export function LabsSettingsPanel() {
         <PromptSuggestionsRow />
         <SimlockHostsRow />
         <FastWorktreeCheckoutRow />
+      </SettingsSection>
+      <SettingsSection id="archiving" title="Archiving">
+        <ArchiveSuggestionSettings />
         <ArchiveComboSoundSettings />
       </SettingsSection>
     </SettingsPageContainer>

@@ -1,5 +1,4 @@
 import { useAtomValue } from "@effect/atom-react";
-import { ArchiveSuggestionSettings } from "./ArchiveSuggestionSettings";
 import { AttentionShortcutSettings } from "./AttentionShortcutSettings";
 import {
   NotificationSettings,
@@ -513,10 +512,6 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(settings.sidebarWorkingShelfEnabled !== DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfEnabled
       ? ["Working section"]
       : []),
-    ...(settings.sidebarArchiveSuggestionHours !==
-    DEFAULT_UNIFIED_SETTINGS.sidebarArchiveSuggestionHours
-      ? ["Suggest archiving idle threads"]
-      : []),
     ...(settings.sidebarAutoSettleAfterDays !== DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays
       ? ["Auto-settle inactive threads"]
       : []),
@@ -691,7 +686,6 @@ export function useSettingsRestore(onRestored?: () => void) {
       sidebarProjectGroupingMode: DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode,
       sidebarProjectSortOrder: DEFAULT_UNIFIED_SETTINGS.sidebarProjectSortOrder,
       sidebarWorkingShelfEnabled: DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfEnabled,
-      sidebarArchiveSuggestionHours: DEFAULT_UNIFIED_SETTINGS.sidebarArchiveSuggestionHours,
       sidebarAutoSettleAfterDays: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays,
       sidebarAutoSettleKeepPullRequests: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleKeepPullRequests,
       sidebarAutoSettleOnMerge: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge,
@@ -915,7 +909,6 @@ export function GeneralSettingsPanel() {
             />
           }
         />
-        <ArchiveSuggestionSettings />
       </SettingsSection>
 
       <SettingsSection id="confirmations" title="Confirmations">

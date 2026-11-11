@@ -219,9 +219,9 @@ work still running or waiting on you are never suggested. Dismiss the card, or o
 review list, to keep those threads; a kept thread comes back only after new activity goes idle
 again. Undo works as for any archive.
 
-Change the idle time or turn the card off in **Settings → General → Suggest archiving idle
-threads**. Each device keeps its own choice. Tune or mute the sound in **Settings → Labs →
-Archive combo sound**.
+Change the idle time or turn the card off in **Settings → Labs → Archiving → Suggest archiving
+idle threads**. Each device keeps its own choice. Tune or mute the sound in **Archive combo sound**
+in the same section.
 
 ## Link a pull request
 
