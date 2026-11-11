@@ -53,6 +53,34 @@ describe("V2 client presentation", () => {
     expect(effectiveSnoozed(active, { now: "2026-06-20T00:05:00.000Z" })).toBe(false);
   });
 
+  it("a plain-text question in the latest reply asks for the user until they open it", () => {
+    const runId = RunId.make("run-reply-question");
+    const completedAt = DateTime.makeUnsafe("2026-06-20T00:10:00.000Z");
+    const present = (overrides: Partial<typeof v2ThreadShell>) =>
+      presentThreadShell(environmentId, {
+        ...v2ThreadShell,
+        latestRunId: runId,
+        latestRunCompletedAt: completedAt,
+        status: "completed",
+        replyCheck: { runId, asksUser: true },
+        lastVisitedAt: DateTime.makeUnsafe("2026-06-20T00:00:00.000Z"),
+        ...overrides,
+      });
+    expect(present({}).asksUserQuestion).toBe(true);
+    expect(
+      present({ lastVisitedAt: DateTime.makeUnsafe("2026-06-20T00:11:00.000Z") }).asksUserQuestion,
+    ).toBe(false);
+    // A newer run means the user already replied.
+    expect(present({ latestRunId: RunId.make("run-after-reply") }).asksUserQuestion).toBe(false);
+    expect(present({ replyCheck: { runId, asksUser: false } }).asksUserQuestion).toBe(false);
+
+    // The completion notice waits for the check, except on servers that never send one.
+    expect(present({}).replyCheckPending).toBe(false);
+    expect(present({ replyCheck: null }).replyCheckPending).toBe(true);
+    expect(present({ replyCheck: undefined }).replyCheckPending).toBe(false);
+    expect(present({ replyCheck: null, status: "running" }).replyCheckPending).toBe(false);
+  });
+
   it("moves a running thread with any question out of Working", () => {
     for (const capability of [{ blocking: false }, { blocking: true }, {}]) {
       const shell = presentThreadShell(environmentId, {

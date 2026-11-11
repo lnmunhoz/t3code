@@ -276,6 +276,7 @@ export function resolveThreadListV2Status(
     EnvironmentThreadShell,
     | "hasPendingApprovals"
     | "hasPendingUserInput"
+    | "asksUserQuestion"
     | "pendingSubagentRequest"
     | "pendingGuestMessageCount"
     | "runtime"
@@ -285,7 +286,11 @@ export function resolveThreadListV2Status(
   if (thread.hasPendingApprovals || thread.pendingSubagentRequest === "approval") {
     return "approval";
   }
-  if (thread.hasPendingUserInput || thread.pendingSubagentRequest === "user_input") {
+  if (
+    thread.hasPendingUserInput ||
+    thread.pendingSubagentRequest === "user_input" ||
+    thread.asksUserQuestion === true
+  ) {
     return "input";
   }
   // A guest is waiting on the owner; the agent's own requests come first.

@@ -93,6 +93,7 @@ import {
   resolveSidebarRowAccessibility,
   type SidebarDropVerb,
   resolveSidebarRowStatus,
+  isSidebarAttentionStatus,
   resolveThreadLastVisitedAt,
   shouldRecedeSidebarThread,
   resolveWorkingStartedAt,
@@ -842,6 +843,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                         }
                       : null;
   const isWokeStatus = topStatus?.icon === "woke";
+  const needsYou = !props.isActive && isSidebarAttentionStatus(status);
 
   const branchMismatch = resolveLocalCheckoutBranchMismatch({
     effectiveEnvMode: thread.worktreePath === null ? "local" : "worktree",
@@ -1367,6 +1369,17 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           >
             {/* `contents` keeps one-line rows a single flex row. */}
             <div className={multiline ? "flex h-6 min-w-0 items-center gap-2.5" : "contents"}>
+              {needsYou ? (
+                <span
+                  aria-hidden
+                  data-testid="sidebar-row-needs-you"
+                  className={cn(
+                    "pointer-events-none absolute rounded-full bg-warning motion-safe:animate-status-pulse",
+                    inFolder ? "left-3.5 size-2" : "left-0.5 size-1.5",
+                    multiline ? "top-3.5" : "top-1/2 -translate-y-1/2",
+                  )}
+                />
+              ) : null}
               {inFolder ? null : (
                 <span
                   className={cn(
