@@ -269,6 +269,7 @@ export function startThreadNotifications(
       const settled = completed && !monitorHoldsWakeCompletion(rawThread);
       const parsedCompletedAt = Date.parse(thread.latestRun?.completedAt ?? "");
       const completedAt = Number.isFinite(parsedCompletedAt) ? parsedCompletedAt : null;
+      const runCompleted = thread.latestRun?.status === "completed" && completedAt !== null;
       const state = {
         raw: rawThread,
         subagentRequest,
@@ -279,6 +280,8 @@ export function startThreadNotifications(
         settled,
         completedAt: settled ? completedAt : null,
         backgroundWake: rawThread.latestRunBackgroundWake === true,
+        runCompletedAt: runCompleted ? completedAt : null,
+        awaitingReplyCheck: thread.replyCheckPending === true,
       };
       next.set(thread.id, state);
       changed.push([prior, state]);

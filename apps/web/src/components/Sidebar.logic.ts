@@ -669,6 +669,7 @@ type ThreadStatusInput = Pick<
   | "hasActionableProposedPlan"
   | "hasPendingApprovals"
   | "hasPendingUserInput"
+  | "asksUserQuestion"
   | "pendingSubagentRequest"
   | "pendingGuestMessageCount"
   | "interactionMode"
@@ -945,6 +946,7 @@ type SidebarThreadStatusInput = Pick<
   SidebarThreadSummary,
   | "hasPendingApprovals"
   | "hasPendingUserInput"
+  | "asksUserQuestion"
   | "pendingSubagentRequest"
   | "pendingGuestMessageCount"
   | "runtime"
@@ -955,7 +957,11 @@ export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): Si
   if (thread.hasPendingApprovals || thread.pendingSubagentRequest === "approval") {
     return "approval";
   }
-  if (thread.hasPendingUserInput || thread.pendingSubagentRequest === "user_input") {
+  if (
+    thread.hasPendingUserInput ||
+    thread.pendingSubagentRequest === "user_input" ||
+    thread.asksUserQuestion === true
+  ) {
     return "input";
   }
   // A guest is waiting on the owner; the agent's own requests come first.
@@ -983,6 +989,43 @@ export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): Si
   return "ready";
 }
 
+/** The agent is blocked until you act: answer, approve, reply to a guest, or lift a usage limit. */
+export function isSidebarAttentionStatus(status: SidebarThreadStatus): boolean {
+  return (
+    status === "input" || status === "approval" || status === "request" || status === "limited"
+  );
+}
+
+/**
+ * Where `thread.nextAttention` ranks a thread: 0 blocked on you, 1 an unseen
+ * failure, 2 an unseen completion, null nothing for you to look at.
+ */
+export function resolveThreadAttentionRank(
+  thread: ThreadStatusInput & SidebarThreadStatusInput,
+): 0 | 1 | 2 | null {
+  const status = resolveSidebarThreadStatus(thread);
+  if (isSidebarAttentionStatus(status)) return 0;
+  if (status === "failed" && hasUnseenFailure(thread)) return 1;
+  if (status === "ready" && hasUnseenCompletion(thread)) return 2;
+  return null;
+}
+
+/**
+ * The thread `thread.nextAttention` opens: the first by rank, keeping list order within a
+ * rank, or the one after the current thread so repeated presses walk the queue.
+ */
+export function resolveNextAttentionThreadKey(input: {
+  threads: ReadonlyArray<{ readonly key: string; readonly rank: 0 | 1 | 2 | null }>;
+  currentThreadKey: string | null;
+}): string | null {
+  const queue = input.threads
+    .filter((thread) => thread.rank !== null)
+    .sort((left, right) => (left.rank ?? 0) - (right.rank ?? 0));
+  const currentIndex = queue.findIndex((thread) => thread.key === input.currentThreadKey);
+  const next = queue[(currentIndex + 1) % queue.length];
+  return next === undefined || next.key === input.currentThreadKey ? null : next.key;
+}
+
 /**
  * The dot on a closed boring-sidebar folder: the most urgent state among its
  * hidden threads. Waiting threads stay quiet, like their rows.
@@ -991,12 +1034,7 @@ export function resolveSidebarFolderDot(
   threads: ReadonlyArray<ThreadStatusInput & SidebarThreadStatusInput>,
 ): "attention" | "failed" | "unread" | "working" | null {
   const statuses = new Set(threads.map(resolveSidebarThreadStatus));
-  if (
-    statuses.has("input") ||
-    statuses.has("approval") ||
-    statuses.has("request") ||
-    statuses.has("limited")
-  ) {
+  if ([...statuses].some(isSidebarAttentionStatus)) {
     return "attention";
   }
   if (statuses.has("failed")) return "failed";
@@ -1195,7 +1233,11 @@ export function resolveThreadStatusPill(input: {
     };
   }
 
-  if (thread.hasPendingUserInput || thread.pendingSubagentRequest === "user_input") {
+  if (
+    thread.hasPendingUserInput ||
+    thread.pendingSubagentRequest === "user_input" ||
+    thread.asksUserQuestion === true
+  ) {
     return {
       label: "Awaiting Input",
       colorClass: "text-indigo-600 dark:text-indigo-300/90",

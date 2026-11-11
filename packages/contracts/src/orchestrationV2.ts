@@ -442,6 +442,12 @@ const LenientThreadOpens = Schema.NullOr(OrchestrationV2ThreadOpens).pipe(
   Schema.catchDecoding(() => Effect.succeedSome(null)),
 );
 
+export const OrchestrationV2ReplyCheck = Schema.Struct({
+  runId: RunId,
+  asksUser: Schema.Boolean,
+});
+export type OrchestrationV2ReplyCheck = typeof OrchestrationV2ReplyCheck.Type;
+
 export const OrchestrationV2AppThread = Schema.Struct({
   ...OrchestrationV2CreationFields,
   id: ThreadId,
@@ -497,6 +503,8 @@ export const OrchestrationV2AppThread = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
   opens: Schema.optional(LenientThreadOpens),
+  /** Whether the latest checked run's final reply asks the user something; recorded after each run. */
+  replyCheck: Schema.optional(Schema.NullOr(OrchestrationV2ReplyCheck)),
   titleRegeneration: Schema.optional(
     Schema.NullOr(
       Schema.Struct({
@@ -2170,6 +2178,8 @@ export const OrchestrationV2ThreadShell = Schema.Struct({
   tags: Schema.optional(StoredThreadTags),
   lastVisitedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
   opens: Schema.optional(LenientThreadOpens),
+  /** Whether the latest checked run's final reply asks the user something; recorded after each run. */
+  replyCheck: Schema.optional(Schema.NullOr(OrchestrationV2ReplyCheck)),
   titleRegeneration: Schema.optional(
     Schema.NullOr(
       Schema.Struct({
@@ -3608,6 +3618,14 @@ const OrchestrationV2InternalCommand = Schema.Union([
         notification: OrchestrationV2Notification,
       }),
     ),
+  }),
+  /** Records whether a finished run's final reply asks the user something in plain text. */
+  Schema.Struct({
+    type: Schema.Literal("thread.reply-check.record"),
+    commandId: CommandId,
+    threadId: ThreadId,
+    runId: RunId,
+    asksUser: Schema.Boolean,
   }),
 ]);
 export type OrchestrationV2InternalCommand = typeof OrchestrationV2InternalCommand.Type;

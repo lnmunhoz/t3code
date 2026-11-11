@@ -139,6 +139,13 @@ Those defaults use `isDesktop` so they do not steal the
 browser's tab-switch shortcuts. Remove that condition in Settings if you want
 the same jumps in a browser.
 
+`thread.nextAttention` (`mod+shift+u` by default) opens the next thread that needs
+you. Threads waiting on an answer, an approval, a guest request, or a usage limit
+come first, then failures and finished threads you have not opened yet. Press it
+again to move through the rest. In the desktop app, Settings → General → **Jump to
+threads that need you** sets a second shortcut that works from any app and brings
+T3 Code forward first. Sidebar rows that need you show a pulsing dot.
+
 Combine keys with `!` for not, `&&` for and, `||` for or, and parentheses:
 
 ```json

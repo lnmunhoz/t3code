@@ -11,13 +11,28 @@ export interface ThreadNotificationObservation {
   readonly completedAt: number | null;
   /** The latest run answers a background-work progress wake, like a Monitor line. */
   readonly backgroundWake: boolean;
+  /** When the latest run completed, even while the thread needs attention. */
+  readonly runCompletedAt?: number | null;
+  /** The server has not yet decided whether the completed reply asks the user something. */
+  readonly awaitingReplyCheck?: boolean;
 }
 
 /** Matches the push relay's completion confirmation: a final wake can start right after a progress wake. */
 export const RELEASED_COMPLETION_GRACE_MS = 5_000;
 
+// A model check usually answers in a few seconds; this only covers a check that never lands.
+const REPLY_CHECK_WAIT_MS = 30_000;
+
+type Schedule = (run: () => void, delayMs: number) => () => void;
+
+const scheduleTimeout: Schedule = (run, delayMs) => {
+  const timer = setTimeout(run, delayMs);
+  return () => clearTimeout(timer);
+};
+
 export function createThreadNotificationGate<Key>(
   notify: (key: Key, kind: ThreadNotificationKind) => void,
+  schedule: Schedule = scheduleTimeout,
 ) {
   // The newest completion already notified, or deliberately skipped.
   const handled = new Map<Key, number>();
@@ -34,12 +49,24 @@ export function createThreadNotificationGate<Key>(
     }, RELEASED_COMPLETION_GRACE_MS);
     releases.set(key, { at, timer });
   };
-  const skip = (key: Key, at: number | null) => {
-    if (at !== null && at > (handled.get(key) ?? -Infinity)) handled.set(key, at);
+  const skip = (key: Key, at: number | null | undefined) => {
+    if (at != null && at > (handled.get(key) ?? -Infinity)) handled.set(key, at);
   };
   const cancel = (key: Key) => {
     clearTimeout(releases.get(key)?.timer);
     releases.delete(key);
+  };
+  // Completions waiting to learn whether their reply asks the user something.
+  const held = new Map<Key, { readonly at: number; readonly cancel: () => void }>();
+  const unhold = (key: Key) => {
+    held.get(key)?.cancel();
+    held.delete(key);
+  };
+  const complete = (key: Key, at: number) => {
+    unhold(key);
+    if (at <= (handled.get(key) ?? -Infinity)) return;
+    handled.set(key, at);
+    notify(key, "completion");
   };
   // Attention keys with a request id seen since the thread last stopped needing attention.
   const attended = new Map<Key, Set<string>>();
@@ -76,19 +103,35 @@ export function createThreadNotificationGate<Key>(
       // The first sighting, archived threads, and stopped or silent runs never notify completion.
       if (!prior || options.archived || options.quiet) skip(key, next.completedAt);
       const fresh = attend(key, prior, next);
-      if (!prior || options.archived) return;
+      if (!prior || options.archived) {
+        unhold(key);
+        return;
+      }
       if (fresh) {
+        // A reply that asks the user replaces its own completion notice.
+        skip(key, next.runCompletedAt);
+        unhold(key);
         notify(key, "input");
         return;
       }
       const at = next.completedAt;
-      if (!next.settled || at === null || at <= (handled.get(key) ?? -Infinity)) return;
+      if (!next.settled || at === null || at <= (handled.get(key) ?? -Infinity)) {
+        unhold(key);
+        return;
+      }
+      if (next.awaitingReplyCheck) {
+        if (held.get(key)?.at !== at) {
+          unhold(key);
+          held.set(key, { at, cancel: schedule(() => complete(key, at), REPLY_CHECK_WAIT_MS) });
+        }
+        return;
+      }
+      unhold(key);
       if (next.backgroundWake) {
         release(key, at);
         return;
       }
-      handled.set(key, at);
-      notify(key, "completion");
+      complete(key, at);
     },
     /** Stops grace timers while the snapshot is stale; the next observation restarts or drops them. */
     pause(): void {
@@ -101,10 +144,12 @@ export function createThreadNotificationGate<Key>(
     retain(keys: ReadonlySet<Key>): void {
       for (const key of handled.keys()) if (!keys.has(key)) handled.delete(key);
       for (const key of releases.keys()) if (!keys.has(key)) cancel(key);
+      for (const key of held.keys()) if (!keys.has(key)) unhold(key);
       for (const key of attended.keys()) if (!keys.has(key)) attended.delete(key);
     },
     clear(): void {
       for (const key of releases.keys()) cancel(key);
+      for (const key of held.keys()) unhold(key);
       handled.clear();
       attended.clear();
     },

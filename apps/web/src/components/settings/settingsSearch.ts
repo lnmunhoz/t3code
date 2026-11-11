@@ -701,6 +701,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["speech voice tts text to speech system voice samantha"],
   },
   {
+    id: "attention-global-shortcut",
+    title: "Jump to threads that need you",
+    to: "/settings/general",
+    searchTerms: [
+      "global system-wide shortcut hotkey keybinding attention needs input approval done next thread",
+    ],
+  },
+  {
     id: "in-app-notifications",
     title: "In-app notifications",
     to: "/settings/general",

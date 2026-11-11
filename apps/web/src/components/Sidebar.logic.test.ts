@@ -33,6 +33,8 @@ import {
   resolveSidebarDropVerb,
   groupSidebarThreadsByProject,
   resolveSidebarFolderDot,
+  resolveNextAttentionThreadKey,
+  resolveThreadAttentionRank,
   sidebarFolderExpansionKeys,
 } from "./Sidebar.logic";
 import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
@@ -244,6 +246,8 @@ describe("resolveSidebarThreadStatus", () => {
         runtime,
       }),
     ).toBe("approval");
+    // A reply that ends by asking the user something reads the same as a structured question.
+    expect(resolveSidebarThreadStatus({ ...idle, asksUserQuestion: true })).toBe("input");
   });
 
   it("shows a waiting guest message as a Request, below the agent's own requests", () => {
@@ -1638,6 +1642,70 @@ describe("resolveSidebarFolderDot", () => {
     expect(resolveSidebarFolderDot([idle, working])).toBe("working");
     expect(resolveSidebarFolderDot([working, unread])).toBe("unread");
     expect(resolveSidebarFolderDot([unread, limited])).toBe("attention");
+  });
+});
+
+describe("thread.nextAttention", () => {
+  it("ranks what needs you and walks it by rank, then list order", () => {
+    const seen = {
+      hasActionableProposedPlan: false,
+      hasPendingApprovals: false,
+      hasPendingUserInput: false,
+      interactionMode: "default" as const,
+      latestRun: makeLatestRun(),
+      lastVisitedAt: "2026-03-09T10:06:00.000Z",
+      runtime: null,
+    };
+    const runtime = {
+      status: "running" as const,
+      activeRunId: null,
+      providerInstanceId: ProviderInstanceId.make("codex"),
+      providerName: "Codex",
+      lastError: null,
+      updatedAt: "2026-03-09T10:00:00.000Z",
+    };
+    const doneUnseen = { ...seen, lastVisitedAt: "2026-03-09T10:04:00.000Z" };
+    const failedUnseen = {
+      ...doneUnseen,
+      latestRun: { ...makeLatestRun(), status: "failed" as const },
+      runtime: { ...runtime, status: "failed" as const },
+    };
+    const failedSeen = { ...failedUnseen, lastVisitedAt: seen.lastVisitedAt };
+    const needsInput = { ...seen, hasPendingUserInput: true };
+
+    expect(
+      [seen, { ...seen, runtime }, failedSeen, doneUnseen, failedUnseen, needsInput].map(
+        resolveThreadAttentionRank,
+      ),
+    ).toEqual([null, null, null, 2, 1, 0]);
+
+    const threads = [
+      { key: "done", rank: 2 },
+      { key: "quiet", rank: null },
+      { key: "input-a", rank: 0 },
+      { key: "failed", rank: 1 },
+      { key: "input-b", rank: 0 },
+    ] as const;
+    const next = (currentThreadKey: string | null) =>
+      resolveNextAttentionThreadKey({ threads, currentThreadKey });
+    expect(next(null)).toBe("input-a");
+    expect(next("quiet")).toBe("input-a");
+    expect(next("input-a")).toBe("input-b");
+    expect(next("input-b")).toBe("failed");
+    expect(next("failed")).toBe("done");
+    expect(next("done")).toBe("input-a");
+    expect(
+      resolveNextAttentionThreadKey({
+        threads: [{ key: "input-a", rank: 0 }],
+        currentThreadKey: "input-a",
+      }),
+    ).toBeNull();
+    expect(
+      resolveNextAttentionThreadKey({
+        threads: [{ key: "quiet", rank: null }],
+        currentThreadKey: null,
+      }),
+    ).toBeNull();
   });
 });
 

@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import { AttentionShortcutSettings } from "./AttentionShortcutSettings";
 import {
   NotificationSettings,
   NotificationSpeechSettings,
@@ -792,6 +793,7 @@ export function GeneralSettingsPanel() {
         <NotificationSettings />
         <NotificationSpeechSettings />
         <NotificationSpeechVoiceSettings />
+        <AttentionShortcutSettings />
         <SettingsRow
           {...searchableSetting("in-app-notifications")}
           description="Show a toast when another thread finishes, fails, or needs input or approval while this app has focus."

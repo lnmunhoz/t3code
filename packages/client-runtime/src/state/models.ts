@@ -159,6 +159,10 @@ export interface EnvironmentThreadShell {
   readonly hasPendingApprovals: boolean;
   readonly hasPendingUserInput: boolean;
   readonly pendingUserInputAt?: string | null;
+  /** The latest run's final reply asks the user something in plain text, and the user has not opened it since. */
+  readonly asksUserQuestion?: boolean;
+  /** The latest run completed and the server has not yet checked whether its reply asks the user something. */
+  readonly replyCheckPending?: boolean;
   readonly pendingSubagentRequest?: PendingSubagentRequest | null;
   /** Guest messages waiting for the owner to send or dismiss. */
   readonly pendingGuestMessageCount?: number;
@@ -255,6 +259,27 @@ export function scopeProject(
 
 export type PendingSubagentRequest = "approval" | "user_input";
 
+function asksUserQuestion(thread: OrchestrationV2ThreadShell): boolean {
+  const check = thread.replyCheck;
+  if (check == null || !check.asksUser || check.runId !== thread.latestRunId) return false;
+  const completedAt = thread.latestRunCompletedAt;
+  return (
+    completedAt == null ||
+    thread.lastVisitedAt == null ||
+    DateTime.toEpochMillis(thread.lastVisitedAt) < DateTime.toEpochMillis(completedAt)
+  );
+}
+
+// Servers without reply checks omit the field entirely, so only a sent `null` or verdict can be pending.
+function replyCheckPending(thread: OrchestrationV2ThreadShell): boolean {
+  return (
+    thread.replyCheck !== undefined &&
+    (thread.status === "completed" || thread.status === "idle") &&
+    thread.latestRunId !== null &&
+    thread.replyCheck?.runId !== thread.latestRunId
+  );
+}
+
 export function presentThreadShell(
   environmentId: EnvironmentId,
   thread: OrchestrationV2ThreadShell,
@@ -318,6 +343,8 @@ export function presentThreadShell(
         ? iso(thread.pendingRuntimeRequest.createdAt)
         : null,
     pendingSubagentRequest,
+    asksUserQuestion: asksUserQuestion(thread),
+    replyCheckPending: replyCheckPending(thread),
     pendingGuestMessageCount: thread.pendingGuestMessageCount ?? 0,
     hasActionableProposedPlan: thread.hasActionableProposedPlan,
     pendingBackgroundTasks: thread.pendingBackgroundTasks ?? [],

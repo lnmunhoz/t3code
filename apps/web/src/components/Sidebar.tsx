@@ -111,6 +111,7 @@ import {
   getSidebarProjectSettingsKey,
   type SidebarProjectSnapshot,
 } from "../sidebarProjectGrouping";
+import { registerMenuAction } from "../shortcuts/dispatcher";
 import { resolveProjectExpanded, useUiStateStore } from "../uiStateStore";
 import {
   getThreadKeysToDeselectAfterDelete,
@@ -188,6 +189,9 @@ import {
   planSidebarThreadDrop,
   reduceSidebarProjectScopeMenuState,
   resolveAdjacentThreadId,
+  resolveNextAttentionThreadKey,
+  resolveThreadAttentionRank,
+  resolveThreadLastVisitedAt,
   resolveSidebarSweepKeys,
   resolveSidebarDropTarget,
   resolveSidebarDropVerb,
@@ -2887,6 +2891,37 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     },
   );
 
+  const goToNextAttentionThread = () => {
+    const localLastVisitedAtById = useUiStateStore.getState().threadLastVisitedAtById;
+    const candidates = [...pinnedThreads, ...activeThreads, ...workingThreads];
+    const nextKey = resolveNextAttentionThreadKey({
+      currentThreadKey: routeRowThreadKey,
+      threads: candidates.map((thread) => {
+        const key = threadShellKey(thread);
+        return {
+          key,
+          rank: resolveThreadAttentionRank({
+            ...thread,
+            lastVisitedAt: resolveThreadLastVisitedAt(
+              thread.lastVisitedAt,
+              localLastVisitedAtById[key],
+            ),
+          }),
+        };
+      }),
+    });
+    const next = candidates.find((thread) => threadShellKey(thread) === nextKey);
+    if (!next) {
+      toastManager.add({ type: "info", title: "Nothing else needs you right now" });
+      return;
+    }
+    navigateToThread(scopeThreadRef(next.environmentId, next.id));
+  };
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- lets the desktop app's system-wide shortcut run the same jump through the menu action channel
+  useEffect(
+    () => registerMenuAction("thread.nextAttention", goToNextAttentionThread),
+    [goToNextAttentionThread],
+  );
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to window keydown for thread navigation shortcuts using the current thread list
   useEffect(() => {
     const onWindowKeyDown = (event: KeyboardEvent) => {
@@ -2906,6 +2941,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         navigateToThread(scopeThreadRef(targetThread.environmentId, targetThread.id));
         return true;
       };
+      if (command === "thread.nextAttention") {
+        event.preventDefault();
+        event.stopPropagation();
+        goToNextAttentionThread();
+        return;
+      }
       const traversalDirection = threadTraversalDirectionFromCommand(command);
       if (traversalDirection !== null) {
         navigateToThreadKey(
@@ -2924,6 +2965,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     window.addEventListener("keydown", onWindowKeyDown);
     return () => window.removeEventListener("keydown", onWindowKeyDown);
   }, [
+    goToNextAttentionThread,
     keybindings,
     navigateToThread,
     orderedThreadKeys,

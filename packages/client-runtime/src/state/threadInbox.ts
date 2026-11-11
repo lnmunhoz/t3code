@@ -121,6 +121,7 @@ type TrackedInboxThread = WorkingThreadInput &
       | "snoozedUntil"
       | "activeOrderKey"
       | "pendingGuestMessageCount"
+      | "asksUserQuestion"
     >
   >;
 
@@ -221,6 +222,7 @@ export function createInboxReturnTracker() {
         const actionable =
           thread.hasPendingApprovals ||
           thread.hasPendingUserInput ||
+          thread.asksUserQuestion === true ||
           thread.pendingSubagentRequest != null ||
           (thread.pendingGuestMessageCount ?? 0) > 0 ||
           (thread.interactionMode === "plan" && thread.hasActionableProposedPlan) ||

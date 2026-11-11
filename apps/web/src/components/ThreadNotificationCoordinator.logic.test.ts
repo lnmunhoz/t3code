@@ -34,13 +34,18 @@ function fakeTimers(): Disposable {
 
 function harness() {
   const notify = vi.fn();
-  const gate = createThreadNotificationGate<string>(notify);
+  const timers: Array<() => void> = [];
+  const gate = createThreadNotificationGate<string>(notify, (run) => {
+    timers.push(run);
+    return () => timers.splice(timers.indexOf(run) >>> 0, 1);
+  });
   let prior: ThreadNotificationObservation | undefined;
   const observe = (next: ThreadNotificationObservation, options = visible) => {
     gate.observe("thread", prior, next, options);
     prior = next;
   };
-  return { gate, notify, observe };
+  const elapse = () => timers.splice(0).forEach((run) => run());
+  return { gate, notify, observe, elapse, timers };
 }
 
 describe("createThreadNotificationGate", () => {
@@ -110,6 +115,37 @@ describe("createThreadNotificationGate", () => {
       ["thread", "completion"],
       ["thread", "input"],
     ]);
+  });
+
+  it("announces only the question when a completed reply turns out to ask the user", () => {
+    const { notify, observe, elapse } = harness();
+    observe(working);
+    observe({ ...completed(1), runCompletedAt: 1, awaitingReplyCheck: true });
+    expect(notify).not.toHaveBeenCalled();
+    observe({ ...working, attention: "run-1:input", runCompletedAt: 1 });
+    elapse();
+    observe(completed(1));
+    expect(notify.mock.calls).toEqual([["thread", "input"]]);
+  });
+
+  it("announces a held completion once the reply check finds no question", () => {
+    const { notify, observe, timers } = harness();
+    observe(working);
+    observe({ ...completed(1), runCompletedAt: 1, awaitingReplyCheck: true });
+    observe({ ...completed(1), runCompletedAt: 1, awaitingReplyCheck: true });
+    expect(notify).not.toHaveBeenCalled();
+    observe({ ...completed(1), runCompletedAt: 1 });
+    expect(notify.mock.calls).toEqual([["thread", "completion"]]);
+    expect(timers).toHaveLength(0);
+  });
+
+  it("announces a held completion after the wait when no reply check arrives", () => {
+    const { notify, observe, elapse } = harness();
+    observe(working);
+    observe({ ...completed(1), runCompletedAt: 1, awaitingReplyCheck: true });
+    elapse();
+    observe({ ...completed(1), runCompletedAt: 1 });
+    expect(notify.mock.calls).toEqual([["thread", "completion"]]);
   });
 
   it("never notifies existing, archived or stopped completions, including when unarchived", () => {
