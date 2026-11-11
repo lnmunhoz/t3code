@@ -9,8 +9,10 @@ const SCALE_DEGREES = {
 } satisfies Record<ArchiveComboSoundSettings["scale"], ReadonlyArray<number>>;
 // Past two octaves the chime turns into a squeak, so long combos hold the top note.
 const MAX_COMBO_SEMITONES = 24;
-const FANFARE_INTERVALS = [4, 7, 12];
-const FANFARE_SPACING_S = 0.09;
+// The last hit layers a major chord on its note, so the finish stays one sound.
+const FINISH_CHORD_INTERVALS = [4, 7];
+// notification-completion.mp3 strikes twice; starting at the second strike makes one ding per thread.
+const CHIME_SECOND_STRIKE_S = 0.064;
 
 function comboSemitones(step: number, scale: ArchiveComboSoundSettings["scale"]): number {
   const degrees = SCALE_DEGREES[scale];
@@ -38,10 +40,11 @@ function loadChime(context: AudioContext): Promise<AudioBuffer> {
 }
 
 export interface ArchiveComboPlayer {
-  /** One archived thread; `step` counts up from 0 within the current streak. */
-  readonly hit: (step: number) => void;
-  /** The closing flourish after a combo whose last hit was `lastStep`. */
-  readonly finale: (lastStep: number) => void;
+  /**
+   * One sound for one archived thread; `step` counts up from 0 within the current streak.
+   * `last` marks the combo's final archive, which gets the finishing chord when enabled.
+   */
+  readonly hit: (step: number, last: boolean) => void;
 }
 
 /**
@@ -63,7 +66,7 @@ export function createArchiveComboPlayer(
   void chime?.catch(() => undefined);
   let previous: GainNode | null = null;
 
-  const play = (semitones: number, at: number, cutPrevious: boolean) => {
+  const play = (semitones: number, at: number, cutPrevious: boolean, level = 1) => {
     // Overlapping chimes turn to mush at combo speed; each hit fades out the last.
     if (cutPrevious && previous !== null) {
       previous.gain.cancelScheduledValues(at);
@@ -74,14 +77,17 @@ export function createArchiveComboPlayer(
     previous = voice;
     const ratio = 2 ** (semitones / 12);
     if (chime !== null) {
-      voice.gain.value = 0.9;
       void chime
         .then((buffer) => {
+          const start = Math.max(at, context.currentTime);
+          // A short ramp hides the first strike's leftover tail at the cut.
+          voice.gain.setValueAtTime(0, start);
+          voice.gain.linearRampToValueAtTime(0.9 * level, start + 0.004);
           const source = context.createBufferSource();
           source.buffer = buffer;
           source.playbackRate.value = ratio;
           source.connect(voice);
-          source.start(Math.max(at, context.currentTime));
+          source.start(start, CHIME_SECOND_STRIKE_S);
         })
         .catch(() => undefined);
       return;
@@ -94,14 +100,14 @@ export function createArchiveComboPlayer(
       oscillator.frequency.setValueAtTime(frequency, at);
       oscillator.frequency.setValueAtTime(frequency * (4 / 3), at + 0.06);
       voice.gain.setValueAtTime(0.0001, at);
-      voice.gain.exponentialRampToValueAtTime(0.22, at + 0.005);
+      voice.gain.exponentialRampToValueAtTime(0.22 * level, at + 0.005);
     } else {
       const frequency = 440 * ratio;
       oscillator.type = "sine";
       oscillator.frequency.setValueAtTime(frequency * 0.6, at);
       oscillator.frequency.exponentialRampToValueAtTime(frequency, at + 0.05);
       voice.gain.setValueAtTime(0.0001, at);
-      voice.gain.exponentialRampToValueAtTime(0.6, at + 0.008);
+      voice.gain.exponentialRampToValueAtTime(0.6 * level, at + 0.008);
     }
     voice.gain.exponentialRampToValueAtTime(0.0001, end);
     oscillator.connect(voice);
@@ -110,13 +116,12 @@ export function createArchiveComboPlayer(
   };
 
   return {
-    hit: (step) => play(comboSemitones(step, settings.scale), context.currentTime, true),
-    finale: (lastStep) => {
-      if (!settings.finale) return;
-      const top = comboSemitones(lastStep, settings.scale);
-      FANFARE_INTERVALS.forEach((interval, index) =>
-        play(top + interval, context.currentTime + FANFARE_SPACING_S * (index + 1), index === 0),
-      );
+    hit: (step, last) => {
+      const root = comboSemitones(step, settings.scale);
+      const at = context.currentTime;
+      play(root, at, true);
+      if (!last || !settings.finale) return;
+      for (const interval of FINISH_CHORD_INTERVALS) play(root + interval, at, false, 0.5);
     },
   };
 }
@@ -131,8 +136,7 @@ export function previewArchiveCombo(settings: ArchiveComboSoundSettings, hits = 
   if (player === null) return;
   let at = 0;
   for (let step = 0; step < hits; step++) {
-    previewTimers.push(setTimeout(() => player.hit(step), at));
+    previewTimers.push(setTimeout(() => player.hit(step, step === hits - 1), at));
     at += comboStepDelayMs(settings.stepMs, step);
   }
-  previewTimers.push(setTimeout(() => player.finale(hits - 1), at));
 }

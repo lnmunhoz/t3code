@@ -12,7 +12,7 @@ import { Button } from "../ui/button";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
 import { SettingsRow } from "./settingsLayout";
-import { searchableSetting } from "./settingsSearch";
+import { useSearchableSetting } from "./settingsSearch";
 
 const VOICE_LABELS = {
   chime: "Completion chime",
@@ -71,6 +71,7 @@ function NestedRow(props: { title: string; description: string; control: ReactNo
 
 /** The game-style combo sound played while the sidebar card archives idle threads. */
 export function ArchiveComboSoundSettings() {
+  const searchableSetting = useSearchableSetting();
   const settings = useClientSettings((current) => current.archiveComboSound);
   const speedLabel =
     SPEEDS.find((speed) => speed.stepMs === settings.stepMs)?.label ?? `${settings.stepMs} ms`;
@@ -169,13 +170,13 @@ export function ArchiveComboSoundSettings() {
             }
           />
           <NestedRow
-            title="Fanfare"
-            description="Finish the combo with a short rising flourish."
+            title="Finishing chord"
+            description="Play the last archive as a bright chord instead of a single note."
             control={
               <Switch
                 checked={settings.finale}
                 onCheckedChange={(checked) => save({ ...settings, finale: Boolean(checked) })}
-                aria-label="Combo fanfare"
+                aria-label="Finishing chord"
               />
             }
           />

@@ -6,6 +6,12 @@ Each entry: date, title, what changed, and why.
 
 ---
 
+## 2026-11-11 — Archive combo plays one sound per thread
+
+**What:** Archiving N threads now plays exactly N sounds. `notification-completion.mp3` strikes twice (about 64 ms apart), so the chime voice now starts at the second strike. The fanfare, three extra notes after the last hit, is replaced by a **Finishing chord** (same `finale` setting): the last hit layers a major chord on its note, played as one sound. Key files: `apps/web/src/archiveComboSound.ts`, `apps/web/src/components/sidebar/SidebarArchiveSuggestion.tsx`, `apps/web/src/components/settings/ArchiveComboSoundSettings.tsx`.
+
+**Why:** Archiving a single thread made several sounds. It should make one sound per archived thread.
+
 ## 2026-11-11 — Archive settings live together in Labs
 
 **What:** The idle-threshold setting (**Suggest archiving idle threads** and its hours field) moved from Settings › General to a new **Archiving** section in Settings › Labs, alongside **Archive combo sound**. Settings search now points there, and General's restore-defaults no longer lists it. Key files: `apps/web/src/components/settings/LabsSettingsPanel.tsx`, `apps/web/src/components/settings/SettingsPanels.tsx`, `apps/web/src/components/settings/settingsSearch.ts`, `docs/user/thread-sidebar.md`.
