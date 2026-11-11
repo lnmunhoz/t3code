@@ -52,7 +52,7 @@ interface ComboRun {
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/** Suggests archiving threads that have sat idle past the threshold in Settings › General. */
+/** Suggests archiving threads that have sat idle past the threshold in Settings › Labs › Archiving. */
 export function SidebarArchiveSuggestion(props: {
   /** The threads the sidebar lists in the current project scope. */
   threads: ReadonlyArray<EnvironmentThreadShell>;

@@ -6,6 +6,12 @@ Each entry: date, title, what changed, and why.
 
 ---
 
+## 2026-11-11 — Archive settings live together in Labs
+
+**What:** The idle-threshold setting (**Suggest archiving idle threads** and its hours field) moved from Settings › General to a new **Archiving** section in Settings › Labs, alongside **Archive combo sound**. Settings search now points there, and General's restore-defaults no longer lists it. Key files: `apps/web/src/components/settings/LabsSettingsPanel.tsx`, `apps/web/src/components/settings/SettingsPanels.tsx`, `apps/web/src/components/settings/settingsSearch.ts`, `docs/user/thread-sidebar.md`.
+
+**Why:** Wanted everything about archiving configured in one place, in Labs.
+
 ## 2026-11-11 — Idle thread housekeeping with a combo sound
 
 **What:** A card at the top of the sidebar (styled like the unsent-draft card) offers to archive threads idle for 12 hours or more. Idle means no messages or runs, an un-settle, or a snooze wake since then. Pinned, snoozed, auto-settle-disabled, and open threads are never suggested, nor anything working or waiting on you; settled threads are. **Review** lists them most idle first; the card's X, or a row's X, keeps those threads until new activity makes them idle again (kept list in localStorage). **Archive all** archives them one by one: each hit plays a chime that climbs a musical scale like a game combo, a ×N counter pops, rows check off with a "+1" and fold away, and a fanfare closes it. Undo groups them as usual. The idle threshold is a device setting in Settings › General (1–720 hours, or off). The sound is tunable in Settings › Labs › Archive combo sound: on/off, voice (the completion chime pitched up, a coin, or a pop), volume, scale, speed, fanfare, and a Preview button. Web and desktop only; mobile is unchanged. Key files: `apps/web/src/components/sidebar/idleArchiveSuggestions.ts` (candidate rules, tested), `apps/web/src/components/sidebar/SidebarArchiveSuggestion.tsx`, `apps/web/src/archiveComboSound.ts`, `apps/web/src/components/settings/ArchiveSuggestionSettings.tsx`, `apps/web/src/components/settings/ArchiveComboSoundSettings.tsx`, `packages/contracts/src/settings.ts` (`sidebarArchiveSuggestionHours`, `archiveComboSound`), one element in `apps/web/src/components/Sidebar.tsx`.
