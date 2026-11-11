@@ -71,7 +71,7 @@ vi.mock(import("../hooks/useSettings"), async (original) => ({
 }));
 vi.mock(import("../threadNotifications"), async (original) => ({
   ...(await original()),
-  playNotificationSound: state.sound,
+  playNotificationAlert: state.sound,
   unlockNotificationAudio: vi.fn(),
   setNotificationBadge: state.badge,
 }));
@@ -265,7 +265,7 @@ it("presents completion notifications and sound as soon as the shell completes",
     }),
   );
   expect(TestNotification.sent.map((sent) => sent.title)).toEqual(["Thread completed"]);
-  expect(state.sound).toHaveBeenCalledWith("completion", expect.any(Function));
+  expect(state.sound).toHaveBeenCalledWith("completion", expect.any(String), expect.any(Function));
 });
 
 it.each([false, true])(
