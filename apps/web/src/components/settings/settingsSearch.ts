@@ -462,6 +462,19 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["hide fold running monitoring threads inbox sidebar shelf"],
   },
   {
+    id: "idle-archive-suggestions",
+    title: "Suggest archiving idle threads",
+    to: "/settings/general",
+    searchTerms: ["housekeeping cleanup archive idle inactive stale old threads sidebar hours"],
+  },
+  {
+    id: "idle-archive-hours",
+    title: "Hours idle before suggesting archive",
+    to: "/settings/general",
+    targetId: "idle-archive-suggestions",
+    searchTerms: ["housekeeping cleanup archive idle inactive threshold timeout"],
+  },
+  {
     id: "boring-sidebar",
     title: "Boring sidebar (group by project)",
     to: "/settings/labs",
@@ -474,6 +487,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     // Shown inside the boring sidebar row only while it is on, so search lands on the parent.
     targetId: "boring-sidebar",
     searchTerms: ["beta boring sidebar folder rows multiline branch pull request details"],
+  },
+  {
+    id: "archive-combo-sound",
+    title: "Archive combo sound",
+    to: "/settings/labs",
+    searchTerms: ["game combo sound chime pitch archive idle threads housekeeping volume fanfare"],
   },
   {
     id: "tool-call-visibility",

@@ -209,6 +209,20 @@ rules to connected environments that support shared settings. Offline environmen
 and older servers keep their previous values. Changing a rule does not reopen
 already settled threads.
 
+## Archive idle threads
+
+On web and desktop, when threads have had no messages or runs for 12 hours, a card at the top of
+the sidebar offers to archive them. **Review** lists them, most idle first, and opens one when you
+click it. **Archive all** archives them one after another, with a sound that climbs with each
+thread. Pinned and snoozed threads, the thread you have open, threads set to never auto-settle, and
+work still running or waiting on you are never suggested. Dismiss the card, or one thread in the
+review list, to keep those threads; a kept thread comes back only after new activity goes idle
+again. Undo works as for any archive.
+
+Change the idle time or turn the card off in **Settings → General → Suggest archiving idle
+threads**. Each device keeps its own choice. Tune or mute the sound in **Settings → Labs →
+Archive combo sound**.
+
 ## Link a pull request
 
 The server finds the PR for each unsettled thread's saved branch, even when your

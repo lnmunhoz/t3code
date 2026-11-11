@@ -5,6 +5,7 @@ import { managedCapabilityDenial } from "@t3tools/contracts";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
 import { useT3ConnectAuthPrompt } from "../clerk/useT3ConnectAuthPrompt";
 import { Button } from "../ui/button";
+import { ArchiveComboSoundSettings } from "./ArchiveComboSoundSettings";
 import { Switch } from "../ui/switch";
 import { ScopedSwitch } from "./ScopedSwitch";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
@@ -25,6 +26,7 @@ export function LabsSettingsPanel() {
         <PromptSuggestionsRow />
         <SimlockHostsRow />
         <FastWorktreeCheckoutRow />
+        <ArchiveComboSoundSettings />
       </SettingsSection>
     </SettingsPageContainer>
   );

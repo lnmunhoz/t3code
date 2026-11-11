@@ -95,6 +95,46 @@ export const SidebarAutoSettleAfterDays = Schema.Number.check(
 );
 export type SidebarAutoSettleAfterDays = typeof SidebarAutoSettleAfterDays.Type;
 const DEFAULT_SIDEBAR_AUTO_SETTLE_AFTER_DAYS: SidebarAutoSettleAfterDays = 7;
+export const MIN_SIDEBAR_ARCHIVE_SUGGESTION_HOURS = 1;
+export const MAX_SIDEBAR_ARCHIVE_SUGGESTION_HOURS = 30 * 24;
+export const SidebarArchiveSuggestionHours = Schema.Int.check(
+  Schema.isBetween({
+    minimum: MIN_SIDEBAR_ARCHIVE_SUGGESTION_HOURS,
+    maximum: MAX_SIDEBAR_ARCHIVE_SUGGESTION_HOURS,
+  }),
+);
+export const ArchiveComboVoice = Schema.Literals(["chime", "coin", "pop"]);
+export const ArchiveComboScale = Schema.Literals(["pentatonic", "major", "chromatic"]);
+const DEFAULT_ARCHIVE_COMBO_SOUND = {
+  enabled: true,
+  voice: "chime",
+  volume: 75,
+  scale: "pentatonic",
+  stepMs: 160,
+  finale: true,
+} as const;
+// The rising chime played per thread archived from the sidebar's idle-threads card.
+export const ArchiveComboSoundSettings = Schema.Struct({
+  enabled: Schema.Boolean.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_ARCHIVE_COMBO_SOUND.enabled)),
+  ),
+  voice: ArchiveComboVoice.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_ARCHIVE_COMBO_SOUND.voice)),
+  ),
+  volume: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 100 })).pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_ARCHIVE_COMBO_SOUND.volume)),
+  ),
+  scale: ArchiveComboScale.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_ARCHIVE_COMBO_SOUND.scale)),
+  ),
+  stepMs: Schema.Int.check(Schema.isBetween({ minimum: 60, maximum: 600 })).pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_ARCHIVE_COMBO_SOUND.stepMs)),
+  ),
+  finale: Schema.Boolean.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_ARCHIVE_COMBO_SOUND.finale)),
+  ),
+});
+export type ArchiveComboSoundSettings = typeof ArchiveComboSoundSettings.Type;
 
 export const MAX_SNOOZE_PRESET_MINUTES = 30 * 24 * 60;
 export const MAX_SNOOZE_PRESETS = 8;
@@ -545,6 +585,13 @@ export const ClientSettingsSchema = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed({})),
   ),
   sidebarWorkingShelfEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  // Device-local: suggest archiving threads idle this many hours; null turns suggestions off.
+  sidebarArchiveSuggestionHours: Schema.NullOr(SidebarArchiveSuggestionHours).pipe(
+    Schema.withDecodingDefault(Effect.succeed(12)),
+  ),
+  archiveComboSound: ArchiveComboSoundSettings.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_ARCHIVE_COMBO_SOUND)),
+  ),
   sidebarProjectGroupingMode: SidebarProjectGroupingMode.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_SIDEBAR_PROJECT_GROUPING_MODE)),
   ),
@@ -2061,6 +2108,8 @@ export const ClientSettingsPatch = Schema.Struct({
   threadDetailsUsageEnabled: Schema.optionalKey(Schema.Boolean),
   threadDetailsItems: Schema.optionalKey(Schema.Record(Schema.String, Schema.Boolean)),
   sidebarWorkingShelfEnabled: Schema.optionalKey(Schema.Boolean),
+  sidebarArchiveSuggestionHours: Schema.optionalKey(Schema.NullOr(SidebarArchiveSuggestionHours)),
+  archiveComboSound: Schema.optionalKey(ArchiveComboSoundSettings),
   sidebarProjectGroupingMode: Schema.optionalKey(SidebarProjectGroupingMode),
   sidebarProjectGroupingOverrides: Schema.optionalKey(
     Schema.Record(TrimmedNonEmptyString, SidebarProjectGroupingMode),
