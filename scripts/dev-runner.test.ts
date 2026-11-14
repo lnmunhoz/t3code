@@ -21,6 +21,7 @@ import { ChildProcessSpawner } from "effect/process";
 
 import {
   checkPortAvailabilityOnHosts,
+  claimDesktopRunnerLock,
   createDevRunnerEnv,
   findFirstAvailableOffset,
   resolveModePortOffsets,
@@ -38,7 +39,7 @@ const netServiceLayer = Layer.succeed(NetService.NetService, {
 
 function mockProcess(exit: number | PlatformError.PlatformError) {
   return ChildProcessSpawner.makeHandle({
-    pid: ChildProcessSpawner.ProcessId(1),
+    pid: ChildProcessSpawner.ProcessId(999_999),
     exitCode:
       typeof exit === "number"
         ? Effect.succeed(ChildProcessSpawner.ExitCode(exit))
@@ -71,6 +72,42 @@ const devServerInput = {
 } as const;
 
 it.layer(NodeServices.layer)("dev-runner", (it) => {
+  describe("claimDesktopRunnerLock", () => {
+    it.effect.each([
+      { name: "claims a checkout no runner holds", holder: undefined, alive: false },
+      { name: "takes over from a runner that died", holder: 4242, alive: false },
+      { name: "refuses while another runner is alive", holder: 4242, alive: true },
+    ])("$name", ({ holder, alive }) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const lockPath = path.join(yield* fs.makeTempDirectoryScoped(), "runtime", "dev.pid");
+        if (holder !== undefined) {
+          yield* fs.makeDirectory(path.dirname(lockPath), { recursive: true });
+          yield* fs.writeFileString(lockPath, `${holder}\n`);
+        }
+
+        if (alive) {
+          const error = yield* claimDesktopRunnerLock(lockPath, 1001, () => true).pipe(
+            Effect.scoped,
+            Effect.flip,
+          );
+          assert.equal(error.pid, 4242);
+          assert.include(error.message, lockPath);
+          assert.equal(yield* fs.readFileString(lockPath), "4242\n");
+          return;
+        }
+
+        const held = yield* claimDesktopRunnerLock(lockPath, 1001, () => false).pipe(
+          Effect.andThen(fs.readFileString(lockPath)),
+          Effect.scoped,
+        );
+        assert.equal(held, "1001\n");
+        assert.isFalse(yield* fs.exists(lockPath));
+      }).pipe(Effect.scoped),
+    );
+  });
+
   describe("createDevRunnerEnv", () => {
     it.effect("forwards the reusable auth token to web dev and removes it for desktop", () =>
       Effect.gen(function* () {
@@ -613,7 +650,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
               tailscaleCalls.push(spawned.args);
               return Effect.succeed(
                 ChildProcessSpawner.makeHandle({
-                  pid: ChildProcessSpawner.ProcessId(2),
+                  pid: ChildProcessSpawner.ProcessId(999_998),
                   exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(0)),
                   isRunning: Effect.succeed(false),
                   kill: () => Effect.void,
