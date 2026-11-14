@@ -6,6 +6,12 @@ Each entry: date, title, what changed, and why.
 
 ---
 
+## 2026-11-12 — A second launch exits cleanly, so dev desktop stops stealing focus
+
+**What:** When T3 Code starts while another copy already holds the single-instance lock, the new copy now exits with code 0 instead of 130 (quit plus an Effect interrupt). The dev runner (`apps/desktop/scripts/dev-electron.mjs`) treats any non-zero exit as a crash and relaunches 120 ms later. So with two `dev:desktop` runners on one checkout, the losing copy relaunched about once a second, forever. Each relaunch fired `second-instance` in the running app, which reveals its window with `app.focus({ steal: true })` on macOS. The logs show about 370 focus grabs in 5 minutes. Key files: `apps/desktop/src/app/DesktopClerk.ts`, `apps/desktop/src/app/DesktopClerk.test.ts`.
+
+**Why:** T3 Code kept taking focus from whatever app was in use and bringing itself to the front after it restarted.
+
 ## 2026-11-12 — One "complete" alert per prompt, not per background wake
 
 **What:** When a background job (a command, Monitor, subagent or delegated task) finishes, the agent starts a new "wake" run to react to it. Each wake run used to end with its own "Thread completed" sound, speech, toast and desktop notification, so one prompt could alert two to seven times. Now, once a prompt has alerted, runs started by a notification (finished background work, a restart note) complete quietly until the next prompt. A failure or a question in a wake run still alerts. A completion that was held while the agent waited on background work (`t3_background_wait`) also used to fire the instant the job left the list, a beat before its wake run started. It now waits the existing 5s grace and is dropped when that wake starts, so the wake run's end is the one alert. The server exposes which run a notification started as `latestRunFromNotification` on the thread shell (absent from older servers, which keep the old behavior). Phone pushes through the relay are unchanged. Key files: `apps/web/src/components/ThreadNotificationCoordinator.logic.ts`, `apps/web/src/components/ThreadNotificationCoordinator.tsx`, `apps/server/src/orchestration-v2/ProjectionStore.ts` (`isNotificationRunForShell` and its SQL mirror), `packages/contracts/src/orchestrationV2.ts`.
