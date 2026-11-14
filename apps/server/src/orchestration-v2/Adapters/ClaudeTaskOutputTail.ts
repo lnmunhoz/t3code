@@ -6,7 +6,7 @@ import * as Path from "effect/Path";
 
 import {
   type BackgroundProgressLine,
-  latestBackgroundProgress,
+  makeBackgroundProgressReader,
   sameBackgroundProgress,
 } from "../BackgroundProgress.ts";
 
@@ -130,7 +130,7 @@ const CLAUDE_TASK_PROGRESS_POLL_MS = 1_000;
 /** A progress line is short; the newest one is near the end. */
 const PROGRESS_TAIL_BYTES = 8 * 1024;
 
-/** Reports a background task's newest `::progress::` line until stop, then clears it. */
+/** Reports a background task's newest progress until stop, then clears it. */
 export const watchClaudeTaskProgress = Effect.fn("ClaudeTaskOutputTail.watchProgress")(
   function* (input: {
     readonly root: string;
@@ -154,6 +154,7 @@ export const watchClaudeTaskProgress = Effect.fn("ClaudeTaskOutputTail.watchProg
       if (attempt + 1 >= MAX_LOCATE_ATTEMPTS || (yield* pause)) return;
     }
     const filePath = file.value;
+    const readProgress = makeBackgroundProgressReader();
     let current: BackgroundProgressLine | null = null;
     let readSize = -1;
     const poll = Effect.gen(function* () {
@@ -175,9 +176,7 @@ export const watchClaudeTaskProgress = Effect.fn("ClaudeTaskOutputTail.watchProg
           if (Option.isSome(bytes)) {
             const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes.value);
             // A window that starts mid-line must not read that fragment as a line.
-            const latest = latestBackgroundProgress(
-              start > 0 ? text.slice(text.search(/[\r\n]/u) + 1) : text,
-            );
+            const latest = readProgress(start > 0 ? text.slice(text.search(/[\r\n]/u) + 1) : text);
             if (latest !== undefined && !sameBackgroundProgress(latest, current)) {
               current = latest;
               yield* input.onProgress(latest);
