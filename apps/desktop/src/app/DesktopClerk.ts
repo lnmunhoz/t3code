@@ -111,9 +111,10 @@ export const make = Effect.gen(function* () {
   const userDataPath = yield* DesktopUserData.resolveUserDataPath(environment);
   yield* electronApp.setPath("userData", userDataPath);
 
-  // Clerk skips the profile lock on macOS. Interrupt before runtime construction because quit is asynchronous.
+  // Clerk skips the profile lock on macOS. Exit 0 rather than quit: quit is asynchronous, and the
+  // interrupt alone exits 130, which dev-electron reads as a crash and relaunches every second.
   if (!(yield* electronApp.requestSingleInstanceLock)) {
-    yield* electronApp.quit;
+    yield* electronApp.exit(0);
     return yield* Effect.interrupt;
   }
   // Chromium opens these caches at the first event-loop turn, before ready.
