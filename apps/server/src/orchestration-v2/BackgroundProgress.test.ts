@@ -1,6 +1,8 @@
 import { assert, describe, it } from "@effect/vitest";
 
-import { latestBackgroundProgress, parseBackgroundProgressLine } from "./BackgroundProgress.ts";
+import { makeBackgroundProgressReader, parseBackgroundProgressLine } from "./BackgroundProgress.ts";
+
+const latestBackgroundProgress = (text: string) => makeBackgroundProgressReader()(text);
 
 describe("parseBackgroundProgressLine", () => {
   it("reads counts and a label, and ignores other lines", () => {
@@ -25,7 +27,7 @@ describe("parseBackgroundProgressLine", () => {
   });
 });
 
-describe("latestBackgroundProgress", () => {
+describe("makeBackgroundProgressReader", () => {
   it("takes the newest complete line and keeps progress through other output", () => {
     assert.deepEqual(
       latestBackgroundProgress("::progress:: 1/4 Unit\nok 1\n::progress:: 2/4 Unit\nok 2\n"),
@@ -44,5 +46,39 @@ describe("latestBackgroundProgress", () => {
     });
     assert.isUndefined(latestBackgroundProgress("stack trace\n  at foo\n"));
     assert.isNull(latestBackgroundProgress("::progress:: 9/9 Unit\n::progress::\n"));
+  });
+  it("reads the counts Playwright and Node's test runner print without a terminal", () => {
+    const read = makeBackgroundProgressReader();
+    // Playwright's list reporter names the total once, then numbers each result.
+    assert.deepEqual(
+      read(
+        "Running 84 tests using 1 worker\n\n  ✓  1 [chromium] › e2e/panel.spec.mjs:24:3 › saves as I type (1.7s)\n",
+      ),
+      { done: 1, total: 84, label: "Playwright" },
+    );
+    // The total stays known after it scrolls out of the window.
+    assert.deepEqual(read("  ✘  12 [webkit] › e2e/panel.spec.mjs:42:3 › pastes (3.1s)\n"), {
+      done: 12,
+      total: 84,
+      label: "Playwright",
+    });
+    assert.deepEqual(latestBackgroundProgress("[31/84] [chromium] › e2e/a.spec.ts:3:1 › opens\n"), {
+      done: 31,
+      total: 84,
+      label: "Playwright",
+    });
+    assert.deepEqual(
+      latestBackgroundProgress("ok 411 - saves\n    ok 2 - at 200%\nnot ok 412 - loads\n  ---\n"),
+      { label: "Tests, 412 done" },
+    );
+
+    // A command's own lines win over a runner's counts printed after them.
+    const own = makeBackgroundProgressReader();
+    assert.deepEqual(own("::progress:: 3/10 E2E\n  ✓  4 [chromium] › e2e/a.spec.ts:3:1 › x\n"), {
+      done: 3,
+      total: 10,
+      label: "E2E",
+    });
+    assert.isUndefined(own("  ✓  5 [chromium] › e2e/a.spec.ts:9:1 › y\n"));
   });
 });
