@@ -32,11 +32,13 @@ import * as ServerSettings from "../../../serverSettings.ts";
 import * as Project from "../../../project/ProjectService.ts";
 import * as ProjectCloneTracker from "../../../project/ProjectCloneTracker.ts";
 import * as ManagedProjectFolders from "../../../project/ManagedProjectFolders.ts";
+import * as ScratchThreadPromotion from "../../../project/ScratchThreadPromotion.ts";
 import * as PeerForwarding from "../../../peer/PeerForwarding.ts";
 import * as GitVcsDriver from "../../../vcs/GitVcsDriver.ts";
 import * as VcsProcess from "../../../vcs/VcsProcess.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as McpToolAccess from "../../McpToolAccess.ts";
+import * as McpToolAccessTestkit from "../../McpToolAccess.testkit.ts";
 import * as ProjectHandlers from "./handlers.ts";
 import { ProjectToolkit } from "./tools.ts";
 
@@ -690,5 +692,74 @@ it.effect("an update the project refuses tells the agent why", () =>
       .pipe(Stream.unwrap, Stream.runCollect, Effect.provide(dependencies));
 
     expect(refused.at(-1)?.result).toMatchObject({ code: "invalid_request", message: detail });
+  }),
+);
+
+it.effect("a move of the calling thread counts as its own turn and carries the continuation", () =>
+  Effect.gen(function* () {
+    const harness = clientLaunchHarness({ runtimeModeCeiling: "full-access", launched: [] });
+    const ownThreadId = ThreadId.make("thread:own");
+    const otherThreadId = ThreadId.make("thread:other");
+    const moves: Array<{
+      readonly threadId: ThreadId;
+      readonly fromOwnTurn: boolean;
+      readonly continuation: string | undefined;
+    }> = [];
+    const dependencies = Layer.mergeAll(
+      harness.dependencies,
+      Layer.succeed(McpInvocationContext.McpInvocationContext, {
+        environmentId: EnvironmentId.make("environment"),
+        requestNamespace: "provider-session-own",
+        thread: {
+          threadId: ownThreadId,
+          providerSessionId: "provider-session-own",
+          providerInstanceId: ProviderInstanceId.make("codex"),
+        },
+        client: undefined,
+        capabilities: new Set(["orchestration" as const]),
+        issuedAt: 0,
+      }),
+      Layer.mock(ThreadManagement.ThreadManagementService)({
+        getThreadShell: (threadId) =>
+          Effect.succeed(McpToolAccessTestkit.liveThreadShell(threadId)),
+      }),
+      Layer.mock(ScratchThreadPromotion.ScratchThreadPromotion)({
+        moveToProject: (input) => {
+          moves.push({
+            threadId: input.threadId,
+            fromOwnTurn: input.fromOwnTurn,
+            continuation: input.continuation,
+          });
+          return Effect.succeed({
+            projectId: input.projectId,
+            workspaceRoot: "/projects/target",
+            movesWhenTurnEnds: input.fromOwnTurn,
+          });
+        },
+      }),
+    );
+    const toolkit = yield* ProjectToolkit.pipe(
+      Effect.provide(
+        McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(Layer.provide(dependencies)),
+      ),
+    );
+    const move = (input: { readonly threadId?: ThreadId; readonly continuationPrompt?: string }) =>
+      toolkit
+        .handle("t3_thread_move", { projectId: harness.projectId, ...input })
+        .pipe(Stream.unwrap, Stream.runCollect, Effect.provide(dependencies));
+
+    const own = yield* move({ continuationPrompt: "Carry on here." });
+    const other = yield* move({ threadId: otherThreadId });
+
+    expect(moves).toEqual([
+      { threadId: ownThreadId, fromOwnTurn: true, continuation: "Carry on here." },
+      { threadId: otherThreadId, fromOwnTurn: false, continuation: undefined },
+    ]);
+    expect(own.at(-1)?.result).toMatchObject({
+      threadId: ownThreadId,
+      workspaceRoot: "/projects/target",
+      movesWhenTurnEnds: true,
+    });
+    expect(other.at(-1)?.result).toMatchObject({ movesWhenTurnEnds: false });
   }),
 );

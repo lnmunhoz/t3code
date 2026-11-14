@@ -19,6 +19,7 @@ import * as Project from "../../../project/ProjectService.ts";
 import * as ProjectCloneTracker from "../../../project/ProjectCloneTracker.ts";
 import { mutateProjectWithClone } from "../../../project/ProjectMutation.ts";
 import * as ManagedProjectFolders from "../../../project/ManagedProjectFolders.ts";
+import * as ScratchThreadPromotion from "../../../project/ScratchThreadPromotion.ts";
 import * as Repositories from "../../../sourceControl/SourceControlRepositoryService.ts";
 import * as GitVcsDriver from "../../../vcs/GitVcsDriver.ts";
 import * as ServerSettings from "../../../serverSettings.ts";
@@ -84,6 +85,35 @@ const access = Effect.gen(function* () {
   return yield* Project.ProjectService;
 });
 export const layer = McpToolAccess.toLayer(ProjectToolkit, {
+  t3_thread_move: McpToolAccess.writesThreads(
+    (input) => [input.threadId],
+    (input) =>
+      Effect.gen(function* () {
+        const scope = yield* McpInvocationContext.McpInvocationContext;
+        const ownThreadId = scope.thread?.threadId;
+        const threadId = input.threadId ?? ownThreadId;
+        if (threadId === undefined)
+          return yield* new OrchestratorMcpFailure({
+            code: "invalid_request",
+            message: "Outside a thread, pass threadId.",
+          });
+        const promotion = yield* ScratchThreadPromotion.ScratchThreadPromotion;
+        const moved = yield* promotion
+          .moveToProject({
+            threadId,
+            projectId: input.projectId,
+            fromOwnTurn: threadId === ownThreadId,
+            continuation: input.continuationPrompt,
+          })
+          .pipe(
+            Effect.mapError(
+              (error) =>
+                new OrchestratorMcpFailure({ code: "invalid_request", message: error.message }),
+            ),
+          );
+        return { threadId, ...moved };
+      }),
+  ),
   t3_thread_launch: McpToolAccess.startsThreads(
     (input) => input,
     (input, { runtimeMode, interactionMode, linkOrigin }) =>

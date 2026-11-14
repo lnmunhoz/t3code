@@ -7693,6 +7693,176 @@ it.layer(layerScratchPromotionTest)("turning a No project thread into a project"
         error.message,
         "Only a No project thread with its own folder can become a project.",
       );
+      const elsewhere = yield* projects.create({
+        commandId: CommandId.make("promotion-regular-elsewhere"),
+        projectId: ProjectId.make("promotion-regular-elsewhere"),
+        title: "Elsewhere",
+        workspaceRoot: "/tmp/runtime-layer-promotion-elsewhere",
+      });
+      const moveError = yield* promotion
+        .moveToProject({ threadId, projectId: elsewhere.id, fromOwnTurn: false })
+        .pipe(Effect.flip);
+      assert.equal(moveError.message, "Only a No project thread can move into a project.");
+    }),
+  );
+
+  it.effect("moves a No project thread and its bound tasks into an existing project", () =>
+    Effect.gen(function* () {
+      const promotion = yield* ScratchThreadPromotion.ScratchThreadPromotion;
+      const projects = yield* ProjectService.ProjectService;
+      const tasks = yield* ScheduledTaskService.ScheduledTaskService;
+      const { folder, createThread } = yield* setup("into");
+      const threadId = yield* createThread("main", folder);
+      const siblingId = yield* createThread("sibling", folder);
+      const target = yield* projects.create({
+        commandId: CommandId.make("promotion-into-target"),
+        projectId: ProjectId.make("promotion-into-target"),
+        title: "Target",
+        workspaceRoot: "/tmp/runtime-layer-promotion-target",
+      });
+      const { task } = yield* tasks.upsert({
+        id: ScheduledTaskId.make("promotion-into-bound"),
+        title: "Bound",
+        prompt: "Check in",
+        enabled: true,
+        schedule: { type: "interval", everyMs: 60_000 },
+        projectId: SCRATCH_PROJECT_ID,
+        threadId,
+        workspaceStrategy: { type: "root" },
+        modelSelection,
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        createdBy: "user",
+        creationSource: "web",
+      });
+      const intoScratch = yield* promotion
+        .moveToProject({ threadId, projectId: SCRATCH_PROJECT_ID, fromOwnTurn: false })
+        .pipe(Effect.flip);
+      assert.equal(intoScratch.message, "Pick a project other than No project.");
+
+      const moved = yield* promotion.moveToProject({
+        threadId,
+        projectId: target.id,
+        fromOwnTurn: false,
+      });
+
+      assert.deepEqual(moved, {
+        projectId: target.id,
+        workspaceRoot: "/tmp/runtime-layer-promotion-target",
+        movesWhenTurnEnds: false,
+      });
+      const shell = yield* shellOf(threadId);
+      assert.equal(shell?.projectId, target.id);
+      assert.isNull(shell?.worktreePath);
+      assert.equal((yield* shellOf(siblingId))?.projectId, SCRATCH_PROJECT_ID);
+      const saved = (yield* tasks.list()).tasks.find((candidate) => candidate.id === task.id);
+      assert.equal(saved?.projectId, target.id);
+      assert.deepEqual(
+        yield* promotion.moveToProject({ threadId, projectId: target.id, fromOwnTurn: false }),
+        moved,
+      );
+    }),
+  );
+
+  it.effect("a busy thread moves only itself, once its turn ends, ending its session", () =>
+    Effect.gen(function* () {
+      const promotion = yield* ScratchThreadPromotion.ScratchThreadPromotion;
+      const projects = yield* ProjectService.ProjectService;
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const eventSink = yield* EventSink.EventSinkV2;
+      const { folder, createThread } = yield* setup("own-turn");
+      const threadId = yield* createThread("busy", folder);
+      const target = yield* projects.create({
+        commandId: CommandId.make("promotion-own-turn-target"),
+        projectId: ProjectId.make("promotion-own-turn-target"),
+        title: "Target",
+        workspaceRoot: "/tmp/runtime-layer-promotion-own-turn",
+      });
+      yield* orchestrator.dispatch({
+        type: "message.dispatch",
+        createdBy: "user",
+        creationSource: "web",
+        commandId: CommandId.make("promotion-own-turn-message"),
+        threadId,
+        messageId: MessageId.make("promotion-own-turn-message"),
+        text: "Keep this run active.",
+        attachments: [],
+        modelSelection,
+        dispatchMode: { type: "start_immediately" },
+      });
+      const providerSessionId = (yield* orchestrator.getThreadProjection(threadId))
+        .providerThreads[0]!.providerSessionId!;
+      const now = yield* DateTime.now;
+      yield* eventSink.write({
+        commandId: CommandId.make("promotion-own-turn-session"),
+        events: [
+          {
+            id: EventId.make("promotion-own-turn-session"),
+            type: "provider-session.attached",
+            threadId,
+            occurredAt: now,
+            payload: {
+              id: providerSessionId,
+              driver,
+              providerInstanceId: modelSelection.instanceId,
+              status: "running",
+              cwd: folder,
+              model: modelSelection.model,
+              capabilities: CodexProviderCapabilitiesV2,
+              createdAt: now,
+              updatedAt: now,
+              lastError: null,
+            },
+          },
+        ],
+      });
+
+      const error = yield* promotion
+        .moveToProject({ threadId, projectId: target.id, fromOwnTurn: false })
+        .pipe(Effect.flip);
+      assert.equal(error.message, '"own-turn busy" is still working. Finish or stop it first.');
+      assert.equal((yield* shellOf(threadId))?.projectId, SCRATCH_PROJECT_ID);
+      assert.include(
+        (yield* orchestrator.getThreadProjection(threadId)).providerSessions.map(
+          (session) => session.id,
+        ),
+        providerSessionId,
+      );
+
+      const deferred = yield* promotion.moveToProject({
+        threadId,
+        projectId: target.id,
+        fromOwnTurn: true,
+      });
+      assert.isTrue(deferred.movesWhenTurnEnds);
+      assert.equal((yield* shellOf(threadId))?.projectId, SCRATCH_PROJECT_ID);
+
+      const afterSequence = yield* orchestrator.getThreadEventSequence(threadId);
+      const run = (yield* orchestrator.getThreadProjection(threadId)).runs[0]!;
+      const completedAt = yield* DateTime.now;
+      yield* eventSink.write({
+        commandId: CommandId.make("promotion-own-turn-completed"),
+        events: [
+          {
+            id: EventId.make("promotion-own-turn-completed"),
+            type: "run.updated",
+            threadId,
+            runId: run.id,
+            occurredAt: completedAt,
+            payload: { ...run, status: "completed", completedAt },
+          },
+        ],
+      });
+      yield* orchestrator
+        .streamStoredEventsFrom({ threadId, afterSequence, eventType: "thread.metadata-updated" })
+        .pipe(Stream.runHead);
+
+      assert.equal((yield* shellOf(threadId))?.projectId, target.id);
+      const sessions = (yield* orchestrator.getThreadProjection(threadId)).providerSessions;
+      assert.notInclude(
+        sessions.map((session) => session.id),
+        providerSessionId,
+      );
     }),
   );
 });

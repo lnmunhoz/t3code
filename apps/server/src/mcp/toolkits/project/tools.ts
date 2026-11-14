@@ -33,6 +33,7 @@ import { Tool, Toolkit } from "effect/ai";
 import * as ProjectService from "../../../project/ProjectService.ts";
 import * as ProjectCloneTracker from "../../../project/ProjectCloneTracker.ts";
 import * as ManagedProjectFolders from "../../../project/ManagedProjectFolders.ts";
+import * as ScratchThreadPromotion from "../../../project/ScratchThreadPromotion.ts";
 import * as ThreadManagementService from "../../../orchestration-v2/ThreadManagementService.ts";
 import * as SourceControlRepositoryService from "../../../sourceControl/SourceControlRepositoryService.ts";
 import * as GitVcsDriver from "../../../vcs/GitVcsDriver.ts";
@@ -178,8 +179,32 @@ const ThreadLaunchTool = Tool.make("t3_thread_launch", {
   .annotate(Tool.Destructive, true)
   .annotate(Tool.OpenWorld, true);
 
+const ThreadMoveTool = Tool.make("t3_thread_move", {
+  ...shared,
+  description:
+    "Move a No project thread into an existing project, keeping its conversation. Omit `threadId` for this thread. This thread moves when your turn ends, so call it last and end your turn; `continuationPrompt` then starts the next turn in the project folder. Files in the old folder stay there.",
+  parameters: Schema.Struct({
+    environmentId: OrchestratorMcpEnvironmentTarget,
+    threadId: Schema.optional(ThreadId),
+    projectId: ProjectId,
+    continuationPrompt: Schema.optional(
+      Schema.String.check(Schema.isMaxLength(120000)).annotate({
+        description: "Queued as the thread's next message, sent in the project folder.",
+      }),
+    ),
+  }),
+  success: Schema.Struct({
+    threadId: ThreadId,
+    projectId: ProjectId,
+    workspaceRoot: Schema.String,
+    movesWhenTurnEnds: Schema.Boolean,
+  }),
+  dependencies: [...shared.dependencies, ScratchThreadPromotion.ScratchThreadPromotion],
+}).annotate(Tool.Destructive, true);
+
 export const ProjectToolkit = Toolkit.make(
   ThreadLaunchTool,
+  ThreadMoveTool,
   ProjectListTool,
   ProjectReadTool,
   ProjectCreateTool,

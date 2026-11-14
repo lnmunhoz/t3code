@@ -1,5 +1,6 @@
 import {
   CommandId,
+  MessageId,
   type OrchestrationV2ThreadShell,
   ProjectId,
   type ThreadId,
@@ -40,10 +41,32 @@ export class ScratchThreadPromotion extends Context.Service<
     readonly promote: (input: {
       readonly threadId: ThreadId;
     }) => Effect.Effect<{ readonly projectId: ProjectId }, ScratchThreadPromotionError>;
+    /**
+     * Moves one No project thread into an existing project's root folder. Its live session
+     * ends and the next turn resumes the conversation there; the old folder stays on disk.
+     * `fromOwnTurn` lets a thread move itself: the move then happens when its turn ends.
+     * `continuation` is queued as the thread's next message once it has moved.
+     */
+    readonly moveToProject: (input: {
+      readonly threadId: ThreadId;
+      readonly projectId: ProjectId;
+      readonly fromOwnTurn: boolean;
+      readonly continuation?: string | undefined;
+    }) => Effect.Effect<
+      {
+        readonly projectId: ProjectId;
+        readonly workspaceRoot: string;
+        readonly movesWhenTurnEnds: boolean;
+      },
+      ScratchThreadPromotionError
+    >;
   }
 >()("t3/project/ScratchThreadPromotion") {}
 
+const OWN_TURN_WAIT_MS = 24 * 60 * 60 * 1_000;
+
 const make = Effect.gen(function* () {
+  const layerScope = yield* Effect.scope;
   const managedFolders = yield* ManagedProjectFolders.ManagedProjectFolders;
   const projects = yield* ProjectService.ProjectService;
   const threads = yield* ThreadManagementService.ThreadManagementService;
@@ -128,6 +151,108 @@ const make = Effect.gen(function* () {
     );
   });
 
+  const moveToProject: ScratchThreadPromotion["Service"]["moveToProject"] = Effect.fn(
+    "ScratchThreadPromotion.moveToProject",
+  )(function* (input) {
+    const thread = yield* threads.getThreadShell(input.threadId).pipe(
+      Effect.mapError(fail("Could not read the thread.")),
+      Effect.filterOrFail(
+        (shell): shell is OrchestrationV2ThreadShell => shell !== null && shell.deletedAt === null,
+        () => new ScratchThreadPromotionError({ reason: "Thread not found." }),
+      ),
+    );
+    const target = yield* projects.getById(input.projectId).pipe(
+      Effect.mapError(fail("Could not read the project.")),
+      Effect.flatMap(
+        Option.match({
+          onNone: () =>
+            Effect.fail(new ScratchThreadPromotionError({ reason: "Project not found." })),
+          onSome: Effect.succeed,
+        }),
+      ),
+    );
+    if (yield* managedFolders.isScratchProject(target.id)) {
+      return yield* new ScratchThreadPromotionError({
+        reason: "Pick a project other than No project.",
+      });
+    }
+    const moved = { projectId: target.id, workspaceRoot: target.workspaceRoot };
+    const moveTasks = scheduledTasks
+      .moveThreadTasks({ threadIds: [thread.id], projectId: target.id })
+      .pipe(Effect.mapError(fail("Could not move the thread's scheduled tasks.")));
+    // Already there: a retry after a lost reply, which only needs its tasks moved.
+    if (thread.projectId === target.id) {
+      yield* moveTasks;
+      return { ...moved, movesWhenTurnEnds: false };
+    }
+    if (!(yield* managedFolders.isScratchProject(thread.projectId))) {
+      return yield* new ScratchThreadPromotionError({
+        reason: "Only a No project thread can move into a project.",
+      });
+    }
+    const records = yield* threads
+      .getThreadRecords(thread.id, ["runs", "runtimeRequests"], { turnItemTypes: [] })
+      .pipe(Effect.mapError(fail(`Could not read "${thread.title}".`)));
+    const busy = threadHasUnfinishedWork(records);
+    if (busy && !input.fromOwnTurn) {
+      return yield* new ScratchThreadPromotionError({
+        reason: `"${thread.title}" is still working. Finish or stop it first.`,
+      });
+    }
+    const move = Effect.gen(function* () {
+      yield* threads
+        .dispatch({
+          type: "thread.project.move",
+          commandId: CommandId.make(`scratch-move:${yield* randomId}`),
+          threadId: thread.id,
+          projectId: target.id,
+        })
+        .pipe(Effect.mapError(fail(`Could not move "${thread.title}". Try again.`)));
+      yield* moveTasks;
+    });
+    const continueThere = Effect.gen(function* () {
+      if (input.continuation === undefined) return;
+      const id = yield* randomId;
+      yield* threads
+        .sendToThread({
+          projectId: target.id,
+          commandId: CommandId.make(`scratch-move-continuation:${id}`),
+          threadId: thread.id,
+          messageId: MessageId.make(`scratch-move-continuation:${id}`),
+          text: input.continuation,
+          attachments: [],
+          mode: "queue",
+          createdBy: "agent",
+          creationSource: "mcp",
+        })
+        .pipe(Effect.mapError(fail("Moved, but the continuation was not queued.")));
+    });
+    if (!busy) {
+      yield* move;
+      yield* continueThere;
+      return { ...moved, movesWhenTurnEnds: false };
+    }
+    // Moving ends the live session, so a thread moving itself waits for its turn to end:
+    // cutting the turn off leaves its tool call open and reads as a failed turn.
+    yield* threads
+      .waitForThread({
+        projectId: thread.projectId,
+        threadId: thread.id,
+        ...(thread.activeRunId === null ? {} : { runId: thread.activeRunId }),
+        timeoutMs: OWN_TURN_WAIT_MS,
+      })
+      .pipe(
+        Effect.flatMap(({ run, timedOut }) =>
+          timedOut
+            ? Effect.void
+            : move.pipe(Effect.andThen(run?.status === "completed" ? continueThere : Effect.void)),
+        ),
+        Effect.ignoreCause({ log: true }),
+        Effect.forkIn(layerScope),
+      );
+    return { ...moved, movesWhenTurnEnds: true };
+  });
+
   const randomId = random.uuidV4();
 
   // bootstrap returns the project that already owns the folder, so retries reuse it.
@@ -153,7 +278,7 @@ const make = Effect.gen(function* () {
       );
   });
 
-  return ScratchThreadPromotion.of({ promote });
+  return ScratchThreadPromotion.of({ promote, moveToProject });
 });
 
 export const layer = Layer.effect(ScratchThreadPromotion, make);

@@ -20,6 +20,7 @@ import {
 
 import { getClientSettings, subscribeClientSettings } from "../hooks/useSettings";
 import { isWindowsPlatform } from "../lib/utils";
+import { readProject } from "../state/entities";
 import { environmentSummaries } from "../state/presentation";
 import { environmentShell } from "../state/shell";
 import { environmentThreadShells } from "../state/threads";
@@ -219,6 +220,17 @@ export function startThreadNotifications(
     }
   };
 
+  // A thread changes project only by moving: from the thread menu or an agent's t3_thread_move.
+  const announceMove = (environmentId: EnvironmentId, thread: OrchestrationV2ThreadShell) => {
+    const project = readProject({ environmentId, projectId: thread.projectId });
+    if (project === null || !getClientSettings().inAppNotificationsEnabled) return;
+    toastManager.add({
+      type: "success",
+      title: `Moved to ${project.title}`,
+      description: thread.title,
+    });
+  };
+
   const observeThreads = (
     environmentId: EnvironmentId,
     entry: WatchedEnvironment,
@@ -251,6 +263,9 @@ export function startThreadNotifications(
       ) {
         next.set(rawThread.id, prior);
         continue;
+      }
+      if (prior !== undefined && prior.raw.projectId !== rawThread.projectId) {
+        announceMove(environmentId, rawThread);
       }
       const thread = presentThreadShell(environmentId, rawThread, subagentRequest);
       let status = resolveSidebarThreadStatus(thread);

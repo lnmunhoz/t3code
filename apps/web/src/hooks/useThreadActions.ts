@@ -12,6 +12,7 @@ import {
   AuthSourceControlWriteScope,
   EnvironmentAuthorizationError,
   EnvironmentId,
+  type ProjectId,
   type ScopedThreadRef,
   ThreadId,
   sessionGrantsScope,
@@ -41,6 +42,7 @@ import {
   readEnvironmentSupportsAutoSettleOptOut,
   readEnvironmentThreadRefs,
   readProject,
+  readProjects,
   readThreadShell,
   readThreadShells,
 } from "../state/entities";
@@ -260,6 +262,29 @@ export function canTurnThreadIntoProject(threadRef: ScopedThreadRef): boolean {
   return project !== null && isScratchProject(project, config.scratchWorkspaceRoot);
 }
 
+/** Projects a No project thread can move into, by title; empty when it cannot move. */
+export function threadMoveTargets(
+  threadRef: ScopedThreadRef,
+): ReadonlyArray<{ readonly id: ProjectId; readonly title: string }> {
+  const thread = readThreadShell(threadRef);
+  const config = appAtomRegistry.get(environmentServerConfigsAtom).get(threadRef.environmentId);
+  if (!thread || config?.environment.capabilities.threadMoveToProject !== true) return [];
+  const current = readProject({
+    environmentId: threadRef.environmentId,
+    projectId: thread.projectId,
+  });
+  if (current === null || !isScratchProject(current, config.scratchWorkspaceRoot)) return [];
+  return readProjects()
+    .filter(
+      (project) =>
+        project.environmentId === threadRef.environmentId &&
+        project.archivedAt == null &&
+        !isScratchProject(project, config.scratchWorkspaceRoot),
+    )
+    .map(({ id, title }) => ({ id, title }))
+    .toSorted((left, right) => left.title.localeCompare(right.title));
+}
+
 function threadOperationFailure(target: ScopedThreadRef) {
   return readEnvironmentScope(target.environmentId, AuthOrchestrationOperateScope)
     ? null
@@ -314,6 +339,7 @@ export function useThreadActions() {
   const createProjectFromThread = useAtomCommand(projectEnvironment.createFromThread, {
     reportFailure: false,
   });
+  const moveThread = useAtomCommand(projectEnvironment.moveThread, { reportFailure: false });
   const stopThreadSession = useOrchestrationCommand(threadEnvironment.stopSession);
   const removeWorktree = useAtomCommand(vcsEnvironment.removeWorktree, {
     reportFailure: false,
@@ -1009,6 +1035,11 @@ export function useThreadActions() {
       createProjectFromThread({
         environmentId: target.environmentId,
         input: { threadId: target.threadId },
+      }),
+    moveThreadToProject: (target: ScopedThreadRef, projectId: ProjectId) =>
+      moveThread({
+        environmentId: target.environmentId,
+        input: { threadId: target.threadId, projectId },
       }),
   };
 }

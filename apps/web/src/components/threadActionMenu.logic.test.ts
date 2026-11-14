@@ -65,13 +65,22 @@ describe("buildThreadActionMenuItems", () => {
     },
   );
 
-  it("disables archive and turning into a project while the thread is running", () => {
+  it("disables archive, turning into a project and moving while the thread is running", () => {
     const items = buildThreadActionMenuItems({
       ...baseState,
       isRunning: true,
       canTurnIntoProject: true,
+      moveTargets: [{ id: "project-app", title: "app" }],
     });
     expect(items.find((item) => item.id === "archive")?.disabled).toBe(true);
     expect(items.find((item) => item.id === "turn-into-project")?.disabled).toBe(true);
+    const move = items.find((item) => item.id === "move-to-project");
+    expect(move?.disabled).toBe(true);
+    expect(move?.children?.map((child) => child.id)).toEqual(["move-to-project:project-app"]);
+    expect(
+      buildThreadActionMenuItems({ ...baseState, moveTargets: [] }).some(
+        (item) => item.id === "move-to-project",
+      ),
+    ).toBe(false);
   });
 });
