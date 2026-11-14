@@ -12,6 +12,12 @@ Each entry: date, title, what changed, and why.
 
 **Why:** `dev:desktop` kept failing to start, and an agent had to be asked to find and kill the leftovers every time. Wanted it to just start.
 
+## 2026-11-14 — "T3 Code Custom" app in Spotlight and Raycast
+
+**What:** `vp run install:mac-launcher` installs `~/Applications/T3 Code Custom.app`, a small launcher with the dev icon that Spotlight and Raycast index like any app. Opening it brings the running dev app forward (`open -b com.t3tools.t3code.dev.t3code`). If the dev app isn't open, it stops an idle dev runner by the PID in its lock file, then starts `vp run dev:desktop` in this checkout, logging to `~/Library/Logs/t3code-custom.log`. Key file: `scripts/install-mac-launcher.sh`.
+
+**Why:** Typing "T3 Code" in Raycast or Spotlight only found the official production build, which isn't used. Wanted this fork to be the one to launch from there.
+
 ## 2026-11-12 — Only one dev:desktop runner per checkout
 
 **What:** `vp run dev:desktop` writes its PID to `apps/desktop/.electron-runtime/dev-desktop.pid` (gitignored) and removes it on exit. A second `dev:desktop` on the same checkout now stops right away with an error naming the running runner's PID. It takes over the file when that PID is dead. Key files: `scripts/dev-runner.ts` (`claimDesktopRunnerLock`), `scripts/dev-runner.test.ts`.
