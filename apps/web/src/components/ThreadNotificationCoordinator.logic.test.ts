@@ -216,6 +216,49 @@ describe("createThreadNotificationGate", () => {
     expect(notify).toHaveBeenCalledTimes(1);
   });
 
+  it("waits out the grace when finished background work releases a held completion", () => {
+    using _timers = fakeTimers();
+    const { notify, observe } = harness();
+    const held = (at: number) => ({ ...working, runCompletedAt: at });
+    const released = (at: number) => ({ ...completed(at), runCompletedAt: at });
+    observe(working);
+    observe(held(1));
+    observe(released(1));
+    expect(notify).not.toHaveBeenCalled();
+    // The wake for the finished work starts within the grace and owns the alert.
+    observe({ ...working, fromNotification: true });
+    vi.advanceTimersByTime(RELEASED_COMPLETION_GRACE_MS);
+    observe({ ...completed(2), runCompletedAt: 2, fromNotification: true });
+    expect(notify.mock.calls).toEqual([["thread", "completion"]]);
+    // Without a wake, the held completion plays once after the grace.
+    observe(working);
+    observe(held(3));
+    observe(released(3));
+    expect(notify).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(RELEASED_COMPLETION_GRACE_MS);
+    expect(notify).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps wake completions quiet once the prompt played, until the next prompt", () => {
+    const { notify, observe } = harness();
+    const wake = { ...working, fromNotification: true };
+    observe(working);
+    observe(completed(1));
+    observe(wake);
+    observe({ ...completed(2), fromNotification: true });
+    observe(wake);
+    observe({ ...completed(3), fromNotification: true });
+    expect(notify.mock.calls).toEqual([["thread", "completion"]]);
+    observe({ ...wake, attention: "run-4:failed" });
+    expect(notify.mock.calls).toEqual([
+      ["thread", "completion"],
+      ["thread", "input"],
+    ]);
+    observe(working);
+    observe(completed(5));
+    expect(notify).toHaveBeenCalledTimes(3);
+  });
+
   it("drops a pending wake completion when the thread is removed or the gate is cleared", () => {
     using _timers = fakeTimers();
     for (const reset of [

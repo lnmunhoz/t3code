@@ -6,6 +6,12 @@ Each entry: date, title, what changed, and why.
 
 ---
 
+## 2026-11-12 — One "complete" alert per prompt, not per background wake
+
+**What:** When a background job (a command, Monitor, subagent or delegated task) finishes, the agent starts a new "wake" run to react to it. Each wake run used to end with its own "Thread completed" sound, speech, toast and desktop notification, so one prompt could alert two to seven times. Now, once a prompt has alerted, runs started by a notification (finished background work, a restart note) complete quietly until the next prompt. A failure or a question in a wake run still alerts. A completion that was held while the agent waited on background work (`t3_background_wait`) also used to fire the instant the job left the list, a beat before its wake run started. It now waits the existing 5s grace and is dropped when that wake starts, so the wake run's end is the one alert. The server exposes which run a notification started as `latestRunFromNotification` on the thread shell (absent from older servers, which keep the old behavior). Phone pushes through the relay are unchanged. Key files: `apps/web/src/components/ThreadNotificationCoordinator.logic.ts`, `apps/web/src/components/ThreadNotificationCoordinator.tsx`, `apps/server/src/orchestration-v2/ProjectionStore.ts` (`isNotificationRunForShell` and its SQL mirror), `packages/contracts/src/orchestrationV2.ts`.
+
+**Why:** The completion sound triggered two or three times per session. The agent would stop, background things kept running, and when they finished it made the sound again. Wanted the sound to be more accurate about when work is actually done: one sound per prompt.
+
 ## 2026-11-11 — Archive combo plays one sound per thread
 
 **What:** Archiving N threads now plays exactly N sounds. `notification-completion.mp3` strikes twice (about 64 ms apart), so the chime voice now starts at the second strike. The fanfare, three extra notes after the last hit, is replaced by a **Finishing chord** (same `finale` setting): the last hit layers a major chord on its note, played as one sound. Key files: `apps/web/src/archiveComboSound.ts`, `apps/web/src/components/sidebar/SidebarArchiveSuggestion.tsx`, `apps/web/src/components/settings/ArchiveComboSoundSettings.tsx`.

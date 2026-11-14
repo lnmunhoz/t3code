@@ -280,6 +280,7 @@ export function startThreadNotifications(
         settled,
         completedAt: settled ? completedAt : null,
         backgroundWake: rawThread.latestRunBackgroundWake === true,
+        fromNotification: rawThread.latestRunFromNotification === true,
         runCompletedAt: runCompleted ? completedAt : null,
         awaitingReplyCheck: thread.replyCheckPending === true,
       };
