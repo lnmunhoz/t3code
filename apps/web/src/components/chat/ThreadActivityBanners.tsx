@@ -270,7 +270,12 @@ export function backgroundWorkNowItem(input: {
         presentation.title
       ),
     description: only ? (
-      only.activity
+      // Fixed-width digits keep the bar beside the count from shifting as it climbs.
+      only.progress ? (
+        <span className="tabular-nums">{only.activity}</span>
+      ) : (
+        only.activity
+      )
     ) : newest ? (
       <>
         {newest.label}: {newest.activity}
