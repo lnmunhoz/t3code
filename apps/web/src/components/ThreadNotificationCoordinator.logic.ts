@@ -20,6 +20,8 @@ export interface ThreadNotificationObservation {
   readonly runCompletedAt?: number | null;
   /** The server has not yet decided whether the completed reply asks the user something. */
   readonly awaitingReplyCheck?: boolean;
+  /** The latest run answers a notification, like finished background work, not a prompt. */
+  readonly fromNotification?: boolean;
 }
 
 /** Matches the push relay's completion confirmation: a final wake can start right after a progress wake. */
@@ -51,9 +53,15 @@ const scheduleTimeout: Schedule = (run, delayMs) => {
 };
 
 export function createThreadNotificationGate<Key>(
-  notify: (key: Key, kind: ThreadNotificationKind) => void,
+  notifyListener: (key: Key, kind: ThreadNotificationKind) => void,
   schedule: Schedule = scheduleTimeout,
 ) {
+  // Threads that alerted since their latest prompt; their wake runs then complete quietly.
+  const alerted = new Set<Key>();
+  const notify = (key: Key, kind: ThreadNotificationKind) => {
+    alerted.add(key);
+    notifyListener(key, kind);
+  };
   // The newest completion already notified, or deliberately skipped.
   const handled = new Map<Key, number>();
   // Wake completions waiting out the grace, by completion time; no timer while paused.
@@ -121,6 +129,9 @@ export function createThreadNotificationGate<Key>(
         return;
       }
       cancel(key);
+      if (!next.fromNotification && !next.settled && next.runCompletedAt == null) {
+        alerted.delete(key);
+      }
       // The first sighting, archived or snoozed threads, and stopped or silent runs never notify completion.
       if (!prior || silenced) skip(key, next.completedAt);
       const fresh = attend(key, prior, next);
@@ -140,6 +151,11 @@ export function createThreadNotificationGate<Key>(
         unhold(key);
         return;
       }
+      if (next.fromNotification && alerted.has(key)) {
+        skip(key, at);
+        unhold(key);
+        return;
+      }
       if (next.awaitingReplyCheck) {
         if (held.get(key)?.at !== at) {
           unhold(key);
@@ -148,7 +164,9 @@ export function createThreadNotificationGate<Key>(
         return;
       }
       unhold(key);
-      if (next.backgroundWake) {
+      // Finished background work releases a held completion just before its wake run starts.
+      const releasedByWork = !prior.settled && prior.runCompletedAt === at;
+      if (next.backgroundWake || releasedByWork) {
         release(key, at);
         return;
       }
@@ -167,12 +185,14 @@ export function createThreadNotificationGate<Key>(
       for (const key of releases.keys()) if (!keys.has(key)) cancel(key);
       for (const key of held.keys()) if (!keys.has(key)) unhold(key);
       for (const key of attended.keys()) if (!keys.has(key)) attended.delete(key);
+      for (const key of alerted) if (!keys.has(key)) alerted.delete(key);
     },
     clear(): void {
       for (const key of releases.keys()) cancel(key);
       for (const key of held.keys()) unhold(key);
       handled.clear();
       attended.clear();
+      alerted.clear();
     },
   };
 }

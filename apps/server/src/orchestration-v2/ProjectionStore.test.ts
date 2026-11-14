@@ -1524,22 +1524,24 @@ it.effect("reads a delegated child's recent, unfinished and task runs without it
   }).pipe(Effect.provide(layerTest)),
 );
 
-it.effect("shells flag a latest run triggered by a provider background wake", () =>
+it.effect("shells flag a latest run triggered by a background wake or another notification", () =>
   Effect.gen(function* () {
     const store = yield* ProjectionStore.ProjectionStoreV2;
     const threadId = yield* addRolledBackRecoveryCandidate("background-wake");
     const initial = yield* store.getThreadProjection(threadId);
     const at = initial.updatedAt;
     let ordinal = 1;
-    for (const [id, source, outcome, expected] of [
-      ["background-task", { kind: "background_task" }, "updated", true],
-      ["monitor", { kind: "monitor" }, "updated", true],
-      ["command", { kind: "command" }, "updated", true],
-      ["command-finished", { kind: "command" }, "completed", false],
-      ["monitor-stopped", { kind: "monitor" }, "cancelled", false],
-      ["subagent", { kind: "subagent" }, "updated", false],
-      ["delegated", { kind: "delegated_task", taskIds: [] }, "updated", false],
-      ["steered", { kind: "background_task" }, "updated", false],
+    for (const [id, source, outcome, expected, fromNotification] of [
+      ["background-task", { kind: "background_task" }, "updated", true, true],
+      ["monitor", { kind: "monitor" }, "updated", true, true],
+      ["command", { kind: "command" }, "updated", true, true],
+      ["command-finished", { kind: "command" }, "completed", false, true],
+      ["monitor-stopped", { kind: "monitor" }, "cancelled", false, true],
+      ["subagent", { kind: "subagent" }, "updated", false, true],
+      ["delegated", { kind: "delegated_task", taskIds: [] }, "updated", false, true],
+      ["restart", { kind: "system" }, "updated", false, true],
+      ["steered", { kind: "background_task" }, "updated", false, false],
+      ["prompt", null, "updated", false, false],
     ] as const) {
       const messageId = MessageId.make(`message:background-wake:${id}`);
       yield* store.apply({
@@ -1552,15 +1554,17 @@ it.effect("shells flag a latest run triggered by a provider background wake", ()
           threadId,
           runId: null,
           nodeId: null,
-          createdBy: "agent",
-          creationSource: "server",
+          createdBy: source === null ? "user" : "agent",
+          creationSource: source === null ? "web" : "server",
           role: "user",
           text: id,
           attachments: [],
           streaming: false,
           createdAt: at,
           updatedAt: at,
-          notification: { source, outcome, summary: "Background activity updated" },
+          ...(source === null
+            ? {}
+            : { notification: { source, outcome, summary: "Background activity updated" } }),
           ...(id === "delegated"
             ? {
                 delegatedCompletion: {
@@ -1616,6 +1620,11 @@ it.effect("shells flag a latest run triggered by a provider background wake", ()
       assert.deepEqual(
         shells.map((shell) => shell?.latestRunBackgroundWake),
         [expected, expected],
+        id,
+      );
+      assert.deepEqual(
+        shells.map((shell) => shell?.latestRunFromNotification),
+        [fromNotification, fromNotification],
         id,
       );
       yield* assertShellIndexCoversShells();
