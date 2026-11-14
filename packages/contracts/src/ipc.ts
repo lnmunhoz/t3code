@@ -1041,6 +1041,11 @@ export interface DesktopBridge {
   onNotificationBadgeClear: (listener: () => void) => () => void;
   onTrackpadScrollBegin: (listener: () => void) => () => void;
   onTrackpadScrollEnd: (listener: () => void) => () => void;
+  /** Dev desktop only: whether dev:desktop has rebuilt the server into a build not yet loaded. */
+  getDevServerBuildReady?: () => Promise<boolean>;
+  onDevServerBuildReady?: (listener: (ready: boolean) => void) => () => void;
+  /** Dev desktop only: restart the app onto that newer server build. */
+  restartForDevServerBuild?: () => Promise<void>;
   /**
    * Renderer `window.focus()` cannot raise an Electron window, and on Wayland
    * only the main process can spend a notification click's activation token.

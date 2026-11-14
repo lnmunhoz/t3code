@@ -1,4 +1,6 @@
 import "vite-plus/test/config";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- tsdown runs onSuccess in plain Node.
+import * as NodeFS from "node:fs";
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- tsdown needs the asset path when it reads this config.
 import * as NodePath from "node:path";
 import { defineConfig, mergeConfig } from "vite-plus";
@@ -38,6 +40,8 @@ const packMode = process.env.T3CODE_PACK_EXE;
 const packBootstrap = packMode === "1" || packMode === "bootstrap";
 const packExecutable = packBootstrap || packMode === "bundle";
 const cliAssetDir = process.env.T3CODE_CLI_ASSET_DIR ?? "";
+// dev:desktop rebuilds into dist-next while the app runs from dist; a restart swaps it in.
+const devStagedBuild = process.env.T3CODE_SERVER_DEV_STAGE === "1";
 if (packExecutable && !cliAssetDir) throw new Error("Build the executable with build:exe.");
 // TEMPORARY one-time Node fix. Remove when fixed: https://github.com/nodejs/node/issues/67048
 // No linux-arm64: --build-sea output cannot load on 16/64 KiB page kernels, so it builds natively.
@@ -94,7 +98,20 @@ export default mergeConfig(
         : packExecutable
           ? ["src/binMain.ts"]
           : ["src/bin.ts", "src/claude-history-worker.ts"],
-      outDir: packBootstrap ? "dist-exe" : packExecutable ? cliAssetDir : "dist",
+      outDir: packBootstrap
+        ? "dist-exe"
+        : packExecutable
+          ? cliAssetDir
+          : devStagedBuild
+            ? "dist-next"
+            : "dist",
+      // The marker tells the desktop app this staged build is complete, not mid-write.
+      ...(devStagedBuild
+        ? {
+            onSuccess: (config: { readonly outDir: string }) =>
+              NodeFS.writeFileSync(NodePath.join(config.outDir, ".complete"), ""),
+          }
+        : {}),
       sourcemap: !packExecutable,
       clean: true,
       // SEA can only resolve built-ins; keep dynamic imports inside each emitted module.

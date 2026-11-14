@@ -44,8 +44,17 @@ const watchedDirectories = [
       "SnapShotAccessibilityWorker.cjs",
     ]),
   },
-  { directory: "../server/dist", files: new Set(["bin.mjs"]) },
 ];
+// Server code rebuilds into dist-next in the background; the app swaps it in only when asked,
+// so a rebuild never restarts the app under running agents or mid-write.
+const serverDir = NodePath.join(desktopDir, "../server");
+const liveServerDir = NodePath.join(serverDir, "dist");
+const stagedServerDir = NodePath.join(serverDir, "dist-next");
+const serverRestartRequestPath = NodePath.join(
+  desktopDir,
+  ".electron-runtime",
+  "server-build-restart",
+);
 const forcedShutdownTimeoutMs = 1_500;
 const restartDebounceMs = 120;
 const childTreeGracePeriodMs = 1_200;
@@ -105,6 +114,59 @@ function cleanupStaleDevApps() {
       stdio: "ignore",
     },
   );
+}
+
+let serverWatcher = null;
+
+function startServerWatcher() {
+  serverWatcher = NodeChildProcess.spawn("vp", ["pack", "--watch"], {
+    cwd: serverDir,
+    env: { ...process.env, T3CODE_SERVER_DEV_STAGE: "1" },
+    stdio: ["ignore", "ignore", "inherit"],
+    shell: hostPlatform === "win32",
+  });
+  serverWatcher.once("error", (error) => {
+    console.error("[dev-electron] server rebuild watcher failed to start:", error.message);
+  });
+}
+
+// The staged build has no web client, so the live one carries over.
+function swapInStagedServerBuild() {
+  const marker = NodePath.join(stagedServerDir, ".complete");
+  if (!NodeFS.existsSync(marker)) return;
+  const swapDir = NodePath.join(serverDir, "dist-swap");
+  const retiredDir = NodePath.join(serverDir, "dist-prev");
+  NodeFS.rmSync(swapDir, { recursive: true, force: true });
+  NodeFS.renameSync(stagedServerDir, swapDir);
+  // A rebuild that started meanwhile clears the marker; keep the live build then.
+  if (!NodeFS.existsSync(NodePath.join(swapDir, ".complete"))) {
+    NodeFS.rmSync(swapDir, { recursive: true, force: true });
+    return;
+  }
+  NodeFS.rmSync(retiredDir, { recursive: true, force: true });
+  NodeFS.renameSync(liveServerDir, retiredDir);
+  NodeFS.renameSync(swapDir, liveServerDir);
+  const retiredClient = NodePath.join(retiredDir, "client");
+  if (NodeFS.existsSync(retiredClient)) {
+    NodeFS.renameSync(retiredClient, NodePath.join(liveServerDir, "client"));
+  }
+  NodeFS.rmSync(retiredDir, { recursive: true, force: true });
+}
+
+function restartWithStagedServerBuild() {
+  restartQueue = restartQueue
+    .catch(() => undefined)
+    .then(async () => {
+      await stopApp();
+      try {
+        swapInStagedServerBuild();
+      } catch (error) {
+        console.error("[dev-electron] could not swap in the new server build:", error);
+      }
+      if (!shuttingDown) {
+        startApp();
+      }
+    });
 }
 
 function startApp() {
@@ -252,6 +314,10 @@ async function shutdown(exitCode) {
   }
 
   await stopApp();
+  if (serverWatcher?.pid !== undefined) {
+    serverWatcher.kill("SIGTERM");
+    killChildTreeByPid(serverWatcher.pid, "TERM");
+  }
   killChildTree("TERM");
   await new Promise((resolve) => {
     setTimeout(resolve, childTreeGracePeriodMs);
@@ -273,7 +339,16 @@ function isProcessAlive(pid) {
 
 startWatchers();
 cleanupStaleDevApps();
+NodeFS.rmSync(serverRestartRequestPath, { force: true });
+startServerWatcher();
 startApp();
+
+// The app writes this file when its "Restart to load server changes" button is clicked.
+setInterval(() => {
+  if (shuttingDown || !NodeFS.existsSync(serverRestartRequestPath)) return;
+  NodeFS.rmSync(serverRestartRequestPath, { force: true });
+  restartWithStagedServerBuild();
+}, 1_000).unref();
 
 // A runner killed without signalling us (closed agent shell, SIGKILL) would leave this watcher
 // relaunching its app forever, holding the T3 home so the next dev:desktop server cannot start.

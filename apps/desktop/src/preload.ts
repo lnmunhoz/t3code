@@ -114,6 +114,13 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     ipcRenderer.on(IpcChannels.TRACKPAD_SCROLL_END_CHANNEL, handler);
     return () => ipcRenderer.removeListener(IpcChannels.TRACKPAD_SCROLL_END_CHANNEL, handler);
   },
+  getDevServerBuildReady: () => ipcRenderer.invoke(IpcChannels.DEV_SERVER_BUILD_READY_CHANNEL),
+  onDevServerBuildReady: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, ready: unknown) => listener(ready === true);
+    ipcRenderer.on(IpcChannels.DEV_SERVER_BUILD_READY_CHANNEL, handler);
+    return () => ipcRenderer.removeListener(IpcChannels.DEV_SERVER_BUILD_READY_CHANNEL, handler);
+  },
+  restartForDevServerBuild: () => ipcRenderer.invoke(IpcChannels.DEV_SERVER_BUILD_RESTART_CHANNEL),
   revealWindow: () => ipcRenderer.invoke(IpcChannels.REVEAL_WINDOW_CHANNEL),
   getSystemLocale: () => {
     const result = ipcRenderer.sendSync(IpcChannels.GET_SYSTEM_LOCALE_CHANNEL);
