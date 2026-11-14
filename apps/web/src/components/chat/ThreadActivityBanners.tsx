@@ -1,5 +1,7 @@
 import type {
   EnvironmentId,
+  OrchestrationV2BackgroundProgress,
+  OrchestrationV2BackgroundTaskProgress,
   OrchestrationV2PendingBackgroundTask,
   OrchestrationV2ProviderGoal,
   OrchestrationV2ProviderSession,
@@ -194,12 +196,48 @@ export function runStopNowItem(input: {
   };
 }
 
+const progressCount = new Intl.NumberFormat();
+
+/** "Unit tests 412 / 1,484" from a command's `::progress::` line. */
+function backgroundProgressText(progress: OrchestrationV2BackgroundTaskProgress): string {
+  const counts =
+    progress.done === undefined || progress.total === undefined
+      ? undefined
+      : `${progressCount.format(progress.done)} / ${progressCount.format(progress.total)}`;
+  return [progress.label, counts].filter(Boolean).join(" ");
+}
+
+function BackgroundProgressBar({
+  progress,
+}: {
+  readonly progress: OrchestrationV2BackgroundTaskProgress & { readonly total: number };
+}) {
+  const done = Math.min(progress.done ?? 0, progress.total);
+  return (
+    <span
+      role="progressbar"
+      aria-label={progress.label ?? "Progress"}
+      aria-valuemin={0}
+      aria-valuemax={progress.total}
+      aria-valuenow={done}
+      className="relative h-1 w-12 shrink-0 self-center overflow-hidden rounded-full bg-muted-foreground/15"
+    >
+      <span
+        className="absolute inset-0 origin-left rounded-full bg-muted-foreground/55 transition-transform duration-300 ease-out motion-reduce:transition-none"
+        style={{ transform: `scaleX(${done / progress.total})` }}
+      />
+    </span>
+  );
+}
+
 /** Background commands and subagents, for the end of the timeline. */
 export function backgroundWorkNowItem(
   input: {
     readonly environmentId: EnvironmentId;
     readonly threadId: ThreadId;
     readonly tasks: ReadonlyArray<OrchestrationV2PendingBackgroundTask>;
+    /** Commands' own `::progress::` lines, by task. */
+    readonly progress: OrchestrationV2BackgroundProgress;
     readonly turnItems: ThreadStructure["turnItems"];
     readonly stopDisabled: boolean;
     readonly stopping: boolean;
@@ -211,6 +249,7 @@ export function backgroundWorkNowItem(
   const { onOpenThread } = input;
   const presentation = presentPendingBackgroundWork(input.tasks, resolve);
   if (presentation === null) return null;
+  const progressByTaskId = new Map(input.progress.map((progress) => [progress.taskId, progress]));
   const rows = presentation.items.map((task) => {
     const itemKey =
       input.tasks.find((pending) => pending.taskId === task.taskId)?.nativeItemId ?? task.taskId;
@@ -219,6 +258,7 @@ export function backgroundWorkNowItem(
       (candidate) => (candidate.nativeItemRef?.nativeId || candidate.id) === itemKey,
     );
     const subagent = item?.type === "subagent" ? item : undefined;
+    const progress = progressByTaskId.get(task.taskId);
     return {
       task,
       label:
@@ -231,7 +271,10 @@ export function backgroundWorkNowItem(
         ) : (
           task.label
         ),
-      activity: subagent?.progress?.replace(/\s+/gu, " ").trim() || null,
+      activity:
+        subagent?.progress?.replace(/\s+/gu, " ").trim() ||
+        (progress ? backgroundProgressText(progress) : null),
+      progress,
       startedAtMs: item?.startedAt ? DateTime.toEpochMillis(item.startedAt) : null,
       updatedAtMs: subagent ? DateTime.toEpochMillis(subagent.updatedAt) : 0,
     };
@@ -242,6 +285,9 @@ export function backgroundWorkNowItem(
     .toSorted((left, right) => right.updatedAtMs - left.updatedAtMs)[0];
   const isCommand = (row: (typeof rows)[number]) => row.task.kind !== "subagent";
   const startedAtMs = only?.startedAtMs ?? null;
+  const counted = (only ? [only] : rows)
+    .map((row) => row.progress)
+    .find((progress) => progress?.total !== undefined);
   return {
     id: `background-work:${input.threadId}`,
     icon: rows.every(isCommand) ? <TerminalIcon /> : <CircleDashedIcon />,
@@ -277,6 +323,9 @@ export function backgroundWorkNowItem(
     ),
     actions: (
       <>
+        {counted?.total === undefined ? null : (
+          <BackgroundProgressBar progress={{ ...counted, total: counted.total }} />
+        )}
         {startedAtMs === null ? null : (
           <span
             ref={tickTextContent(

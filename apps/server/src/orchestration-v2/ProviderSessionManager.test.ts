@@ -9,6 +9,7 @@ import {
   type ModelSelection,
   type OrchestrationV2AppThread,
   type OrchestrationV2DomainEvent,
+  type OrchestrationV2BackgroundProgress,
   type OrchestrationV2PromptSuggestion,
   type OrchestrationV2ProviderCapabilities,
   type OrchestrationV2ProviderSession,
@@ -3335,6 +3336,53 @@ it.effect(
 
       yield* effect.pipe(Effect.scoped, Effect.provide(layerTest({ state, idleTimeoutMs: 1_000 })));
     }),
+);
+
+it.effect("ProviderSessionManagerV2 serves each thread its background commands' progress", () =>
+  Effect.gen(function* () {
+    const state = yield* Ref.make(emptyState);
+    const effect = Effect.gen(function* () {
+      const idAllocator = yield* IdAllocator.IdAllocatorV2;
+      const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+      const threadId = ThreadId.make("thread-provider-session-manager-progress");
+      const otherThreadId = ThreadId.make("thread-provider-session-manager-progress-other");
+      const providerSessionId = yield* idAllocator.allocate.providerSession({
+        providerInstanceId: modelSelection.instanceId,
+        threadId,
+      });
+      yield* manager.open({ threadId, providerSessionId, modelSelection, runtimePolicy });
+      const queue = (yield* Ref.get(state)).eventQueues.get(String(providerSessionId));
+      const report = (
+        target: ThreadId,
+        taskId: string,
+        progress: { readonly done: number; readonly total: number } | null,
+      ) =>
+        Queue.offer(queue!, {
+          type: "background_progress.updated",
+          driver: CODEX_DRIVER,
+          threadId: target,
+          taskId,
+          progress: progress === null ? null : { taskId, label: "Unit tests", ...progress },
+        });
+      const received = yield* Queue.unbounded<OrchestrationV2BackgroundProgress>();
+      yield* manager.subscribeBackgroundProgress(threadId).pipe(
+        Stream.runForEach((progress) => Queue.offer(received, progress)),
+        Effect.forkScoped,
+      );
+      assert.deepEqual(yield* Queue.take(received), []);
+
+      yield* report(threadId, "tests", { done: 1, total: 4 });
+      assert.deepEqual(yield* Queue.take(received), [
+        { taskId: "tests", label: "Unit tests", done: 1, total: 4 },
+      ]);
+      // Another thread's progress must not reach this subscriber.
+      yield* report(otherThreadId, "other", { done: 2, total: 9 });
+      yield* report(threadId, "tests", null);
+      assert.deepEqual(yield* Queue.take(received), []);
+    });
+
+    yield* effect.pipe(Effect.scoped, Effect.provide(layerTest({ state, idleTimeoutMs: 1_000 })));
+  }),
 );
 
 const openSessionWithBackgroundCommand = (fixtureName: string) =>

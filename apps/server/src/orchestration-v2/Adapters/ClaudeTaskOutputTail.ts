@@ -4,6 +4,12 @@ import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 
+import {
+  type BackgroundProgressLine,
+  latestBackgroundProgress,
+  sameBackgroundProgress,
+} from "../BackgroundProgress.ts";
+
 /** The SDK withholds stdout until tool results; tail task_started files for live output.
  * The private Claude layout can change; failures omit live output and retain the final result. */
 
@@ -124,3 +130,72 @@ export const tailClaudeTaskOutput = Effect.fn("ClaudeTaskOutputTail.tail")(funct
     last = yield* pause;
   }
 });
+
+const CLAUDE_TASK_PROGRESS_POLL_MS = 1_000;
+/** A progress line is short; the newest one is near the end. */
+const PROGRESS_TAIL_BYTES = 8 * 1024;
+
+/** Reports a background task's newest `::progress::` line until stop, then clears it. */
+export const watchClaudeTaskProgress = Effect.fn("ClaudeTaskOutputTail.watchProgress")(
+  function* (input: {
+    readonly root: string;
+    readonly sessionId: string;
+    readonly taskId: string;
+    readonly stop: Deferred.Deferred<void>;
+    readonly onProgress: (progress: BackgroundProgressLine | null) => Effect.Effect<void>;
+  }) {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const pause = Deferred.await(input.stop).pipe(
+      Effect.as(true),
+      Effect.timeoutOrElse({
+        duration: CLAUDE_TASK_PROGRESS_POLL_MS,
+        orElse: () => Effect.succeed(false),
+      }),
+    );
+    let file = Option.none<string>();
+    for (let attempt = 0; Option.isNone(file); attempt += 1) {
+      file = yield* locate(input);
+      if (Option.isSome(file)) break;
+      if (attempt + 1 >= MAX_LOCATE_ATTEMPTS || (yield* pause)) return;
+    }
+    const filePath = file.value;
+    let current: BackgroundProgressLine | null = null;
+    let readSize = -1;
+    const poll = Effect.gen(function* () {
+      while (true) {
+        const size = yield* fileSystem.stat(filePath).pipe(
+          Effect.map((info) => Number(info.size)),
+          Effect.orElseSucceed(() => readSize),
+        );
+        if (size !== readSize && size > 0) {
+          readSize = size;
+          const start = Math.max(0, size - PROGRESS_TAIL_BYTES);
+          const bytes = yield* Effect.scoped(
+            Effect.gen(function* () {
+              const handle = yield* fileSystem.open(filePath, { flag: "r" });
+              yield* handle.seek(BigInt(start), "start");
+              return yield* handle.readAlloc(size - start);
+            }),
+          ).pipe(Effect.orElseSucceed(() => Option.none<Uint8Array>()));
+          if (Option.isSome(bytes)) {
+            const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes.value);
+            // A window that starts mid-line must not read that fragment as a line.
+            const latest = latestBackgroundProgress(
+              start > 0 ? text.slice(text.search(/[\r\n]/u) + 1) : text,
+            );
+            if (latest !== undefined && !sameBackgroundProgress(latest, current)) {
+              current = latest;
+              yield* input.onProgress(latest);
+            }
+          }
+        }
+        if (yield* pause) return;
+      }
+    });
+    yield* poll.pipe(
+      Effect.ensuring(
+        Effect.suspend(() => (current === null ? Effect.void : input.onProgress(null))),
+      ),
+    );
+  },
+);

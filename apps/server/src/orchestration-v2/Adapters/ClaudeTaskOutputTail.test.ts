@@ -4,10 +4,16 @@ import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
+import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Queue from "effect/Queue";
 
-import { claudeTaskOutputRoot, tailClaudeTaskOutput } from "./ClaudeTaskOutputTail.ts";
+import type { BackgroundProgressLine } from "../BackgroundProgress.ts";
+import {
+  claudeTaskOutputRoot,
+  tailClaudeTaskOutput,
+  watchClaudeTaskProgress,
+} from "./ClaudeTaskOutputTail.ts";
 
 const SESSION_ID = "0c91bb28-9e89-4889-bd22-3de9880233d3";
 const TASK_ID = "bk6xreeye";
@@ -126,6 +132,46 @@ describe("tailClaudeTaskOutput", () => {
       yield* Fiber.join(fiber);
       assert.deepEqual(chunks, ["one\n", "two\n"]);
     }).pipe(Effect.provide(NodeServices.layer)),
+  );
+});
+
+describe("watchClaudeTaskProgress", () => {
+  it.live("reports each new progress line, keeps it through other output, and clears on stop", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const { root, tasks, file } = yield* makeTaskFile;
+        yield* fileSystem.makeDirectory(tasks, { recursive: true });
+        yield* fileSystem.writeFileString(file, "> npm test\n::progress:: 0/1484 Unit tests\n");
+        const reports = yield* Queue.unbounded<BackgroundProgressLine | null>();
+        const stop = yield* Deferred.make<void>();
+        const fiber = yield* watchClaudeTaskProgress({
+          root,
+          sessionId: SESSION_ID,
+          taskId: TASK_ID,
+          stop,
+          onProgress: (progress) => Queue.offer(reports, progress),
+        }).pipe(Effect.forkScoped);
+        assert.deepEqual(yield* Queue.take(reports), { done: 0, total: 1484, label: "Unit tests" });
+
+        // More output than the read window pushes the progress line out of view.
+        const noise = "✔ renders the dot\n".repeat(1_000);
+        yield* fileSystem.writeFileString(
+          file,
+          `::progress:: 0/1484 Unit tests\n::progress:: 412/1484 Unit tests\n${noise}`,
+        );
+        yield* fileSystem.writeFileString(
+          file,
+          `::progress:: 412/1484 Unit tests\n${noise}::progress:: 31/84 E2E\n`,
+        );
+        assert.deepEqual(yield* Queue.take(reports), { done: 31, total: 84, label: "E2E" });
+
+        yield* Deferred.succeed(stop, undefined);
+        yield* Fiber.join(fiber);
+        assert.isNull(yield* Queue.take(reports));
+        assert.isTrue(Option.isNone(yield* Queue.poll(reports)));
+      }),
+    ).pipe(Effect.provide(NodeServices.layer)),
   );
 });
 

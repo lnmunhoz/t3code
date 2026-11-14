@@ -6,6 +6,7 @@ import {
   ModelSelection,
   NodeId,
   OrchestrationV2AppThread,
+  OrchestrationV2BackgroundTaskProgress,
   OrchestrationV2ConversationMessage,
   OrchestrationV2ExecutionNode,
   OrchestrationV2ProviderSession,
@@ -180,6 +181,14 @@ export const ProviderAdapterV2Event = Schema.Union([
     threadId: ThreadId,
     runId: RunId,
     text: Schema.String,
+  }),
+  /** Unpersisted progress line of a running background command; null once it stops reporting. */
+  Schema.Struct({
+    type: Schema.Literal("background_progress.updated"),
+    driver: ProviderDriverKind,
+    threadId: ThreadId,
+    taskId: Schema.String,
+    progress: Schema.NullOr(OrchestrationV2BackgroundTaskProgress),
   }),
   Schema.Struct({
     type: Schema.Literal("runtime_request.updated"),

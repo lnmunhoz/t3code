@@ -2252,6 +2252,16 @@ const WsOrchestrationV2SubscribePromptSuggestionRpc = Rpc.make(
   },
 );
 
+const WsOrchestrationV2SubscribeBackgroundProgressRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.subscribeBackgroundProgress,
+  {
+    payload: OrchestrationV2RpcSchemas.subscribeBackgroundProgress.input,
+    success: OrchestrationV2RpcSchemas.subscribeBackgroundProgress.output,
+    error: EnvironmentAuthorizationError,
+    stream: true,
+  },
+);
+
 const WsSubscribeTerminalMetadataRpc = Rpc.make(WS_METHODS.subscribeTerminalMetadata, {
   payload: Schema.Struct({}),
   success: TerminalMetadataStreamEvent,
@@ -2627,4 +2637,5 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2SubscribeThreadRpc,
   WsOrchestrationV2SubscribeCommandOutputRpc,
   WsOrchestrationV2SubscribePromptSuggestionRpc,
+  WsOrchestrationV2SubscribeBackgroundProgressRpc,
 ).middleware(RpcScopeAuthorization);

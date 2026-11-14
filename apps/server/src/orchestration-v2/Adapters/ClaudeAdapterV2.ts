@@ -5,7 +5,11 @@ import {
   toolOutputImages,
 } from "@t3tools/shared/toolOutput";
 import { makeProviderTextDeltaCoalescer } from "./ProviderTextDeltaCoalescer.ts";
-import { claudeTaskOutputRoot, tailClaudeTaskOutput } from "./ClaudeTaskOutputTail.ts";
+import {
+  claudeTaskOutputRoot,
+  tailClaudeTaskOutput,
+  watchClaudeTaskProgress,
+} from "./ClaudeTaskOutputTail.ts";
 import {
   dynamicToolTitle,
   formatReadToolLabel,
@@ -6017,6 +6021,23 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           string,
           { readonly fiber: Fiber.Fiber<void>; readonly stop: Deferred.Deferred<void> }
         >();
+        const taskProgressWatchers = new Map<
+          string,
+          { readonly nativeThreadId: string; readonly stop: Deferred.Deferred<void> }
+        >();
+        const stopTaskProgressWatchers = (
+          ended: (taskId: string, nativeThreadId: string) => boolean,
+        ) =>
+          Effect.forEach(
+            [...taskProgressWatchers].filter(([taskId, watcher]) =>
+              ended(taskId, watcher.nativeThreadId),
+            ),
+            ([taskId, watcher]) => {
+              taskProgressWatchers.delete(taskId);
+              return Deferred.succeed(watcher.stop, undefined);
+            },
+            { discard: true },
+          );
         // Waits for the tail's last read so its output lands before the call settles.
         const stopTaskOutputTail = (toolUseId: string) =>
           Effect.suspend(() => {
@@ -7049,6 +7070,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             });
             yield* clearNativeThreadTaskIdSet(awaitedBackgroundTasksByNativeThread, nativeThreadId);
             yield* endClaudeMonitorTasks((_taskId, task) => task.nativeThreadId === nativeThreadId);
+            yield* stopTaskProgressWatchers((_taskId, owner) => owner === nativeThreadId);
           });
 
         const forgetAbsorbedWake = (nativeThreadId: string) =>
@@ -10694,6 +10716,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               updated.delete(message.task_id);
               return updated;
             });
+            yield* stopTaskProgressWatchers((taskId) => taskId === message.task_id);
             const removed = yield* clearPendingBackgroundTask(
               input.nativeThreadId,
               message.task_id,
@@ -11624,6 +11647,45 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                   Effect.forkIn(sessionScope),
                 );
                 taskOutputTails.set(tailedCall.nativeItemId, { fiber, stop });
+              }
+              if (
+                liveQuery.taskOutputRoot !== undefined &&
+                message.task_type === "local_bash" &&
+                message.is_backgrounded === true &&
+                !taskProgressWatchers.has(message.task_id)
+              ) {
+                const taskId = message.task_id;
+                const threadId = context.input.threadId;
+                const stop = yield* Deferred.make<void>();
+                taskProgressWatchers.set(taskId, {
+                  nativeThreadId: liveQuery.nativeThreadId,
+                  stop,
+                });
+                yield* watchClaudeTaskProgress({
+                  root: liveQuery.taskOutputRoot,
+                  sessionId: message.session_id,
+                  taskId,
+                  stop,
+                  onProgress: (progress) =>
+                    emitProviderEvent({
+                      type: "background_progress.updated",
+                      driver: CLAUDE_PROVIDER,
+                      threadId,
+                      taskId,
+                      progress: progress === null ? null : { taskId, ...progress },
+                    }),
+                }).pipe(
+                  Effect.provideService(FileSystem.FileSystem, fileSystem),
+                  Effect.provideService(Path.Path, path),
+                  Effect.ensuring(
+                    Effect.sync(() => {
+                      if (taskProgressWatchers.get(taskId)?.stop === stop) {
+                        taskProgressWatchers.delete(taskId);
+                      }
+                    }),
+                  ),
+                  Effect.forkIn(sessionScope),
+                );
               }
               context.ignoredTaskIds.add(message.task_id);
               yield* applyBackgroundTaskRosterMessage({

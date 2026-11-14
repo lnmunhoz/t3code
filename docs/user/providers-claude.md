@@ -140,6 +140,19 @@ that use an API key or a `claude setup-token` token don't get it, even with
 `--chrome`, and neither do third-party providers such as Amazon Bedrock. Claude Code
 doesn't support it in WSL.
 
+## Background command progress
+
+While Claude waits on a command it started in the background, the line above the
+composer can show how far the command has got. Have the command print its own
+progress lines:
+
+```
+::progress:: 412/1484 Unit tests
+```
+
+The web and desktop apps show the newest one, as "Unit tests 412 / 1,484" with a small
+bar. The count is optional (`::progress:: Building`), and a bare `::progress::` clears it.
+
 ## OpenRouter
 
 Create a Claude instance with its own config directory, such as

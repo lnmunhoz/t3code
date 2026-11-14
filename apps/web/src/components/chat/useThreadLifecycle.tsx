@@ -82,6 +82,7 @@ import { environmentThreadDetails } from "../../state/threads";
 import { type SideThreadOpenIntent, sideThreadKindOf } from "@t3tools/client-runtime/side-thread";
 import { openSideThread, resolveThreadOpenRoute } from "../../lib/sideChatPane";
 import type { useLocalDispatchState } from "./useLocalDispatchState";
+import { useBackgroundProgress } from "./useBackgroundProgress";
 const RELATED_THREAD_SHELL_WAIT_MS = 1_000;
 
 function actionErrorMessage(error: unknown): string {
@@ -633,12 +634,18 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
           onForceStop: () => void forceStop.forceStopThread(activeThread.id, runStop.runId),
         })
       : null;
+  const backgroundProgress = useBackgroundProgress(
+    environmentId,
+    activeThread?.id ?? null,
+    activeBackgroundTasks,
+  );
   const backgroundWorkNow = activeThread
     ? backgroundWorkNowItem(
         {
           environmentId,
           threadId: activeThread.id,
           tasks: activeBackgroundTasks,
+          progress: backgroundProgress,
           turnItems,
           // Interrupt stops the active run first, not this work; the composer owns that Stop.
           stopDisabled: runIsLive || !canOperateThread || isStoppingBackgroundWork,
