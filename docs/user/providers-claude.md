@@ -104,6 +104,19 @@ To show Claude task lists in the web and desktop apps, add
 **Environment** section in **Settings > Providers**. Each update shows as a Tasks
 row in the thread; open it to see every step.
 
+## Background command progress
+
+While Claude waits on a command it started in the background, the line above the
+composer can show how far the command has got. Have the command print its own
+progress lines:
+
+```
+::progress:: 412/1484 Unit tests
+```
+
+The web and desktop apps show the newest one, as "Unit tests 412 / 1,484" with a small
+bar. The count is optional (`::progress:: Building`), and a bare `::progress::` clears it.
+
 ## OpenRouter
 
 Create a Claude instance with its own config directory, such as

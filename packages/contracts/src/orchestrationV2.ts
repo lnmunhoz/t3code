@@ -3656,6 +3656,7 @@ export const ORCHESTRATION_V2_WS_METHODS = {
   subscribeThread: "orchestration.subscribeThread",
   subscribeCommandOutput: "orchestration.subscribeCommandOutput",
   subscribePromptSuggestion: "orchestration.subscribePromptSuggestion",
+  subscribeBackgroundProgress: "orchestration.subscribeBackgroundProgress",
 } as const;
 
 export const OrchestrationV2SubscribeCommandOutputInput = Schema.Struct({
@@ -3694,6 +3695,26 @@ export const OrchestrationV2PromptSuggestion = Schema.NullOr(
   Schema.Struct({ runId: RunId, text: Schema.String }),
 );
 export type OrchestrationV2PromptSuggestion = typeof OrchestrationV2PromptSuggestion.Type;
+
+export const OrchestrationV2SubscribeBackgroundProgressInput = Schema.Struct({
+  threadId: ThreadId,
+});
+
+/** A running background command's newest `::progress::` line, parsed. */
+export const OrchestrationV2BackgroundTaskProgress = Schema.Struct({
+  taskId: TrimmedNonEmptyString,
+  label: Schema.optional(TrimmedNonEmptyString),
+  done: Schema.optional(NonNegativeInt),
+  total: Schema.optional(PositiveInt),
+});
+export type OrchestrationV2BackgroundTaskProgress =
+  typeof OrchestrationV2BackgroundTaskProgress.Type;
+
+/** Unpersisted progress of the thread's running background commands, one entry per reporting task. */
+export const OrchestrationV2BackgroundProgress = Schema.Array(
+  OrchestrationV2BackgroundTaskProgress,
+);
+export type OrchestrationV2BackgroundProgress = typeof OrchestrationV2BackgroundProgress.Type;
 
 export const OrchestrationV2ArchivedShellSnapshot = Schema.Struct({
   schemaVersion: PositiveInt,
@@ -4377,6 +4398,10 @@ export const OrchestrationV2RpcSchemas = {
   subscribePromptSuggestion: {
     input: OrchestrationV2SubscribePromptSuggestionInput,
     output: OrchestrationV2PromptSuggestion,
+  },
+  subscribeBackgroundProgress: {
+    input: OrchestrationV2SubscribeBackgroundProgressInput,
+    output: OrchestrationV2BackgroundProgress,
   },
 } as const;
 

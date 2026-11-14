@@ -179,6 +179,12 @@ export function createOrchestrationEnvironmentAtoms<R, E>(
         tag: ORCHESTRATION_V2_WS_METHODS.subscribePromptSuggestion,
         idleTtlMs: 0,
       }),
+      // Progress lines of the open thread's running background commands, while it shows them.
+      backgroundProgress: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
+        label: "environment-data:orchestration-v2:background-progress",
+        tag: ORCHESTRATION_V2_WS_METHODS.subscribeBackgroundProgress,
+        idleTtlMs: 0,
+      }),
     },
     turnDiff: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:orchestration:turn-diff",

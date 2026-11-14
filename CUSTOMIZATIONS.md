@@ -6,6 +6,12 @@ Each entry: date, title, what changed, and why.
 
 ---
 
+## 2026-11-14 — Background command progress above the chat
+
+**What:** While an agent waits on a background command, the line above the composer ("Waiting · …") can show how far the command has got: a short text such as "Unit tests 412 / 1,484" and a thin bar. A command opts in by printing its own lines, `::progress:: 412/1484 Unit tests` (the count is optional; a bare `::progress::` clears it). For Claude background Bash commands, the server reads the last 8 KB of the task's output file once a second while the task runs and keeps only the newest progress line. That line reaches clients through a new unpersisted subscription, `orchestration.subscribeBackgroundProgress`, the same way prompt suggestions do: no orchestration events, no database writes, and no other output leaves the server. Other providers do not report progress yet. Web and desktop only; mobile's background work sheet is unchanged. Key files: `apps/server/src/orchestration-v2/BackgroundProgress.ts` (line parser), `apps/server/src/orchestration-v2/Adapters/ClaudeTaskOutputTail.ts` (`watchClaudeTaskProgress`), `apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts`, `apps/server/src/orchestration-v2/ProviderSessionManager.ts` (store and subscription), `background_progress.updated` in `packages/provider-core/src/server/ProviderAdapter.ts`, `packages/contracts/src/orchestrationV2.ts` and `rpc.ts`, `packages/client-runtime/src/state/orchestration.ts`, `apps/web/src/components/chat/ThreadActivityBanners.tsx`, `apps/web/src/components/chat/useBackgroundProgress.ts`, `docs/user/providers-claude.md`.
+
+**Why:** "When the tests are running in the container is there any progress bar that we could see it? I am here in t3code and if I could see the progress of the test in here on top of the chat would be great." The focus-extension container run takes 10+ minutes, and the band only said it was waiting.
+
 ## 2026-11-11 — Archive combo plays one sound per thread
 
 **What:** Archiving N threads now plays exactly N sounds. `notification-completion.mp3` strikes twice (about 64 ms apart), so the chime voice now starts at the second strike. The fanfare, three extra notes after the last hit, is replaced by a **Finishing chord** (same `finale` setting): the last hit layers a major chord on its note, played as one sound. Key files: `apps/web/src/archiveComboSound.ts`, `apps/web/src/components/sidebar/SidebarArchiveSuggestion.tsx`, `apps/web/src/components/settings/ArchiveComboSoundSettings.tsx`.

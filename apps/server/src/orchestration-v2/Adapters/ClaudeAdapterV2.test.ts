@@ -10736,6 +10736,125 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       ),
   );
 
+  it.effect.skipIf(process.getuid === undefined)(
+    "reports a background Bash command's progress line until its task ends",
+    () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const fileSystem = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* fileSystem.makeTempDirectoryScoped({
+            prefix: "t3-claude-task-progress-",
+          });
+          const harness = yield* makeWakeHarnessWithOptions({
+            environment: { CLAUDE_CODE_TMPDIR: root },
+          });
+          const now = yield* DateTime.now;
+          const toolUseId = "toolu_background_tests";
+          const taskId = "background-tests-task";
+          const tasks = path.join(
+            root,
+            `claude-${process.getuid?.()}`,
+            "project",
+            WAKE_NATIVE_SESSION,
+            "tasks",
+          );
+          yield* fileSystem.makeDirectory(tasks, { recursive: true });
+          yield* fileSystem.writeFileString(
+            path.join(tasks, `${taskId}.output`),
+            "> npm test\n::progress:: 3/10 Unit tests\nok 3\n",
+          );
+          const progressReports = () =>
+            harness.events.flatMap((event) =>
+              event.type === "background_progress.updated" ? [event] : [],
+            );
+
+          yield* harness.runtime.startTurn(
+            makeClaudeTestTurnInput({
+              threadId: harness.threadId,
+              providerThread: harness.providerThread,
+              now,
+              attemptId: RunAttemptId.make("attempt-claude-task-progress"),
+              text: "Run the tests in the background.",
+              attachments: [],
+            }),
+          );
+          for (const frame of [
+            claudeSdkFrame({
+              type: "assistant",
+              message: {
+                model: "claude-sonnet-4-6",
+                id: "msg_background_tests",
+                type: "message",
+                role: "assistant",
+                content: [
+                  {
+                    type: "tool_use",
+                    id: toolUseId,
+                    name: "Bash",
+                    input: { command: "npm test", run_in_background: true },
+                  },
+                ],
+                stop_reason: null,
+                stop_sequence: null,
+                usage: { input_tokens: 1, output_tokens: 1 },
+              },
+              parent_tool_use_id: null,
+              uuid: "00000000-0000-4000-8000-000000000b01",
+              session_id: WAKE_NATIVE_SESSION,
+            }),
+            claudeSdkFrame({
+              type: "system",
+              subtype: "task_started",
+              task_id: taskId,
+              tool_use_id: toolUseId,
+              description: "npm test",
+              is_backgrounded: true,
+              task_type: "local_bash",
+              uuid: "00000000-0000-4000-8000-000000000b02",
+              session_id: WAKE_NATIVE_SESSION,
+            }),
+          ]) {
+            yield* Queue.offer(harness.sdkMessages, frame);
+          }
+          yield* harness.until(() => progressReports().length >= 1);
+          assert.deepEqual(progressReports()[0], {
+            type: "background_progress.updated",
+            driver: ProviderDriverKind.make("claudeAgent"),
+            threadId: harness.threadId,
+            taskId,
+            progress: { taskId, done: 3, total: 10, label: "Unit tests" },
+          });
+
+          yield* Queue.offer(
+            harness.sdkMessages,
+            claudeSdkFrame({
+              type: "system",
+              subtype: "task_notification",
+              task_id: taskId,
+              tool_use_id: toolUseId,
+              status: "completed",
+              output_file: path.join(tasks, `${taskId}.output`),
+              summary: "npm test finished",
+              uuid: "00000000-0000-4000-8000-000000000b03",
+              session_id: WAKE_NATIVE_SESSION,
+            }),
+          );
+          yield* harness.until(() => progressReports().length >= 2);
+          assert.isNull(progressReports()[1]?.progress);
+        }).pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              IdAllocator.layer,
+              McpProviderSessions.layer,
+              NodeServices.layer,
+              NodeCrypto.layer,
+            ),
+          ),
+        ),
+      ),
+  );
+
   it.effect("lets the native SDK acknowledge Stop before closing its own query", () =>
     Effect.scoped(
       Effect.gen(function* () {

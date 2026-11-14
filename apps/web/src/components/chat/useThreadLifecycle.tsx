@@ -77,6 +77,7 @@ import { Atom } from "effect/reactivity";
 import { environmentThreadDetails } from "../../state/threads";
 import { openSideChatTab } from "../../lib/sideChatPane";
 import type { useLocalDispatchState } from "./useLocalDispatchState";
+import { useBackgroundProgress } from "./useBackgroundProgress";
 const RELATED_THREAD_SHELL_WAIT_MS = 1_000;
 const NO_RUN_STOP_ATOM = Atom.make<RunStopPresentation | null>(null).pipe(
   Atom.withLabel("web-thread-run-stop:empty"),
@@ -594,11 +595,17 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
           onForceStop: () => void forceStop.forceStopThread(activeThread.id, runStop.runId),
         })
       : null;
+  const backgroundProgress = useBackgroundProgress(
+    environmentId,
+    activeThread?.id ?? null,
+    activeBackgroundTasks,
+  );
   const backgroundWorkNow = activeThread
     ? backgroundWorkNowItem({
         environmentId,
         threadId: activeThread.id,
         tasks: activeBackgroundTasks,
+        progress: backgroundProgress,
         turnItems,
         stopDisabled: !canOperateThread || isStoppingBackgroundWork,
         stopping: isStoppingBackgroundWork,
