@@ -20,7 +20,9 @@ import { ChildProcessSpawner } from "effect/process";
 
 import {
   checkPortAvailabilityOnHosts,
+  claimDesktopRunnerLock,
   createDevRunnerEnv,
+  descendantPids,
   findFirstAvailableOffset,
   resolveModePortOffsets,
   runDevRunnerWithInput,
@@ -37,7 +39,7 @@ const netServiceLayer = Layer.succeed(NetService.NetService, {
 
 function mockProcess(exit: number | PlatformError.PlatformError) {
   return ChildProcessSpawner.makeHandle({
-    pid: ChildProcessSpawner.ProcessId(1),
+    pid: ChildProcessSpawner.ProcessId(999_999),
     exitCode:
       typeof exit === "number"
         ? Effect.succeed(ChildProcessSpawner.ExitCode(exit))
@@ -70,6 +72,69 @@ const devServerInput = {
 } as const;
 
 it.layer(NodeServices.layer)("dev-runner", (it) => {
+  describe("claimDesktopRunnerLock", () => {
+    it.effect.each([
+      { name: "claims a checkout no runner holds", holder: undefined, alive: false },
+      { name: "takes over from a runner that died", holder: 4242, alive: false },
+      { name: "refuses while another runner is alive", holder: 4242, alive: true },
+    ])("$name", ({ holder, alive }) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const lockPath = path.join(yield* fs.makeTempDirectoryScoped(), "runtime", "dev.pid");
+        if (holder !== undefined) {
+          yield* fs.makeDirectory(path.dirname(lockPath), { recursive: true });
+          yield* fs.writeFileString(lockPath, `${holder}\n`);
+        }
+
+        if (alive) {
+          const error = yield* claimDesktopRunnerLock(lockPath, 1001, () => true).pipe(
+            Effect.scoped,
+            Effect.flip,
+          );
+          assert.equal(error.pid, 4242);
+          assert.include(error.message, lockPath);
+          assert.equal(yield* fs.readFileString(lockPath), "4242\n");
+          return;
+        }
+
+        const held = yield* claimDesktopRunnerLock(lockPath, 1001, () => false).pipe(
+          Effect.andThen(fs.readFileString(lockPath)),
+          Effect.scoped,
+        );
+        assert.equal(held, "1001\n");
+        assert.isFalse(yield* fs.exists(lockPath));
+      }).pipe(Effect.scoped),
+    );
+  });
+
+  describe("descendantPids", () => {
+    it("finds the whole tree below the root and nothing beside it", () => {
+      // vp (10) runs web vite (11) and the desktop task (12 → 13 dev-electron → 14 Electron);
+      // 20 is an unrelated sibling, 0 is macOS's self-parented kernel_task.
+      const ps = [
+        "    0     0",
+        "    1     0",
+        "   10     1",
+        "   11    10",
+        "   12    10",
+        "   13    12",
+        "   14    13",
+        "   20     1",
+        "",
+      ].join("\n");
+      assert.deepEqual([...descendantPids(ps, 10)].sort(), [11, 12, 13, 14]);
+      assert.deepEqual(descendantPids(ps, 14), []);
+    });
+
+    it("never returns the whole machine for launchd or the kernel as root", () => {
+      const ps = ["    0     0", "    1     0", "   10     1", "   11    10", ""].join("\n");
+      assert.deepEqual(descendantPids(ps, 1), []);
+      assert.deepEqual(descendantPids(ps, 0), []);
+      assert.deepEqual(descendantPids(ps, -1), []);
+    });
+  });
+
   describe("createDevRunnerEnv", () => {
     it.effect("forwards the reusable auth token to web dev and removes it for desktop", () =>
       Effect.gen(function* () {
@@ -501,7 +566,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
               tailscaleCalls.push(spawned.args);
               return Effect.succeed(
                 ChildProcessSpawner.makeHandle({
-                  pid: ChildProcessSpawner.ProcessId(2),
+                  pid: ChildProcessSpawner.ProcessId(999_998),
                   exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(0)),
                   isRunning: Effect.succeed(false),
                   kill: () => Effect.void,

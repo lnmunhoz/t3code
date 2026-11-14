@@ -66,8 +66,11 @@ await waitForResources({
   tcpPort: port,
 });
 
+const runnerPid = Number.parseInt(process.env.T3CODE_DEV_RUNNER_PID ?? "", 10);
+
 const childEnv = { ...process.env };
 delete childEnv.ELECTRON_RUN_AS_NODE;
+delete childEnv.T3CODE_DEV_RUNNER_PID;
 const devProtocolClient = resolveDevProtocolClient();
 if (devProtocolClient) {
   childEnv.T3CODE_DESKTOP_APP_USER_MODEL_ID = devProtocolClient.appBundleId;
@@ -258,9 +261,29 @@ async function shutdown(exitCode) {
   process.exit(exitCode);
 }
 
+// Signal 0 only probes; EPERM still means the process exists.
+function isProcessAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code === "EPERM";
+  }
+}
+
 startWatchers();
 cleanupStaleDevApps();
 startApp();
+
+// A runner killed without signalling us (closed agent shell, SIGKILL) would leave this watcher
+// relaunching its app forever, holding the T3 home so the next dev:desktop server cannot start.
+if (runnerPid > 0) {
+  setInterval(() => {
+    if (!isProcessAlive(runnerPid)) {
+      void shutdown(0);
+    }
+  }, 1_000).unref();
+}
 
 process.once("SIGINT", () => {
   void shutdown(130);

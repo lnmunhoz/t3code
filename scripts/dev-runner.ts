@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import * as NodeChildProcess from "node:child_process";
 import * as NodeOS from "node:os";
 
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
@@ -194,6 +195,85 @@ export class DevRunnerBuiltNeedsShareError extends Schema.TaggedError<DevRunnerB
     return `--built only works with \`dev --share\` (got ${this.mode}${this.mode === "dev" ? " without --share" : ""}): the backend serves the built client on the tailnet URL.`;
   }
 }
+
+export class DevRunnerDesktopAlreadyRunningError extends Schema.TaggedError<DevRunnerDesktopAlreadyRunningError>()(
+  "DevRunnerDesktopAlreadyRunningError",
+  {
+    pid: Schema.Number,
+    lockPath: Schema.String,
+  },
+) {
+  override get message(): string {
+    return `dev:desktop is already running for this checkout (dev-runner pid ${this.pid}). Use that app, or stop that runner first: a second one fights it for the app's single-instance lock and closes its window on every rebuild. If pid ${this.pid} is not a dev runner, delete ${this.lockPath}.`;
+  }
+}
+
+/**
+ * Every PID below `rootPid` in `ps -axo pid=,ppid=` output.
+ * A root of 1 or lower is launchd or the kernel: everything descends from it, so it returns nothing rather than the
+ * whole machine. (A test's fake child with pid 1 once had the finalizer SIGTERM every app on the Mac.)
+ */
+export const descendantPids = (psOutput: string, rootPid: number): ReadonlyArray<number> => {
+  if (!Number.isInteger(rootPid) || rootPid <= 1) return [];
+  const childrenByParent = new Map<number, Array<number>>();
+  for (const line of psOutput.split("\n")) {
+    const [pid, ppid] = line.trim().split(/\s+/).map(Number);
+    if (!Number.isInteger(pid) || !Number.isInteger(ppid) || pid === ppid) continue;
+    childrenByParent.set(ppid, [...(childrenByParent.get(ppid) ?? []), pid]);
+  }
+  const found: Array<number> = [];
+  let parents: ReadonlyArray<number> = [rootPid];
+  while (parents.length > 0) {
+    parents = parents.flatMap((parent) => childrenByParent.get(parent) ?? []);
+    found.push(...parents);
+  }
+  return found;
+};
+
+// Signal 0 only probes; EPERM still means the process exists.
+const isProcessAlive = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as { readonly code?: unknown }).code === "EPERM";
+  }
+};
+
+export const claimDesktopRunnerLock = Effect.fn("dev-runner.claimDesktopRunnerLock")(function* (
+  lockPath: string,
+  ownPid: number,
+  isAlive: (pid: number) => boolean = isProcessAlive,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const holder = Number.parseInt(
+    yield* fs.readFileString(lockPath).pipe(Effect.orElseSucceed(() => "")),
+    10,
+  );
+  if (holder > 0 && holder !== ownPid && isAlive(holder)) {
+    return yield* new DevRunnerDesktopAlreadyRunningError({ pid: holder, lockPath });
+  }
+  const written = yield* fs.makeDirectory(path.dirname(lockPath), { recursive: true }).pipe(
+    Effect.andThen(fs.writeFileString(lockPath, `${ownPid}\n`)),
+    Effect.as(true),
+    Effect.catch((cause) =>
+      Effect.logWarning(
+        `[dev-runner] could not write ${lockPath}, so a second dev:desktop will not be refused.`,
+        cause,
+      ).pipe(Effect.as(false)),
+    ),
+  );
+  if (!written) return;
+  yield* Effect.addFinalizer(() =>
+    fs.readFileString(lockPath).pipe(
+      Effect.flatMap((current) =>
+        Number.parseInt(current, 10) === ownPid ? fs.remove(lockPath) : Effect.void,
+      ),
+      Effect.ignore,
+    ),
+  );
+});
 
 const optionalStringConfig = (name: string): Config.Config<string | undefined> =>
   Config.String(name).pipe(
@@ -770,6 +850,21 @@ export const runDevRunnerWithInput = Effect.fn("dev-runner.runDevRunnerWithInput
     return;
   }
 
+  // A second dev:desktop on one checkout loses Electron's single-instance lock, and its
+  // dev-electron pkills every dev app of the checkout on each rebuild.
+  if (input.mode === "dev:desktop") {
+    const path = yield* Path.Path;
+    yield* claimDesktopRunnerLock(
+      path.join(
+        path.dirname(import.meta.dirname),
+        "apps/desktop/.electron-runtime/dev-desktop.pid",
+      ),
+      process.pid,
+    );
+    // dev-electron.mjs exits when this PID dies, so a killed runner leaves no app holding the T3 home.
+    env.T3CODE_DEV_RUNNER_PID = String(process.pid);
+  }
+
   const sharedWebPort = BASE_WEB_PORT + webOffset;
   let built = false;
   if (input.share) {
@@ -892,6 +987,23 @@ export const runDevRunnerWithInput = Effect.fn("dev-runner.runDevRunnerWithInput
         }),
     ),
   );
+
+  // Vite+ does not pass SIGTERM on to the tasks it starts, so stopping the runner orphaned them.
+  // Added after the spawn, this finalizer runs first, while the tasks still descend from Vite+.
+  if (!(yield* HostProcess.isWindows)) {
+    yield* Effect.addFinalizer(() =>
+      Effect.sync(() => {
+        const ps = NodeChildProcess.spawnSync("ps", ["-axo", "pid=,ppid="], { encoding: "utf8" });
+        for (const pid of descendantPids(ps.stdout ?? "", child.pid)) {
+          try {
+            process.kill(pid, "SIGTERM");
+          } catch {
+            // Already gone.
+          }
+        }
+      }),
+    );
+  }
 
   const exitCode = yield* child.exitCode.pipe(
     Effect.mapError(

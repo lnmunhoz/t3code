@@ -6,6 +6,18 @@ Each entry: date, title, what changed, and why.
 
 ---
 
+## 2026-11-14 — dev:desktop's app quits when its runner dies
+
+**What:** The dev runner passes its PID to `apps/desktop/scripts/dev-electron.mjs` as `T3CODE_DEV_RUNNER_PID`. The watcher checks it every second and, once that PID is gone, shuts down along with its Electron window and server. Before this, killing the runner (a closed agent shell, SIGKILL, or a plain SIGTERM, which `vp` does not pass on to its tasks) left the watcher orphaned. It kept relaunching its own window, which held `~/.t3/dev`, so the next `dev:desktop` server quit with `ServerAlreadyRunningError` (exit 78). Orphaned Vite and `vp pack --watch` processes can still be left behind; they only push the next run to the next free port. Key files: `apps/desktop/scripts/dev-electron.mjs`, `scripts/dev-runner.ts`.
+
+**Why:** `dev:desktop` kept failing to start, and an agent had to be asked to find and kill the leftovers every time. Wanted it to just start.
+
+## 2026-11-12 — Only one dev:desktop runner per checkout
+
+**What:** `vp run dev:desktop` writes its PID to `apps/desktop/.electron-runtime/dev-desktop.pid` (gitignored) and removes it on exit. A second `dev:desktop` on the same checkout now stops right away with an error naming the running runner's PID. It takes over the file when that PID is dead. Key files: `scripts/dev-runner.ts` (`claimDesktopRunnerLock`), `scripts/dev-runner.test.ts`.
+
+**Why:** Agents in other sessions kept starting a second dev desktop on this checkout. Two runners fight: the second app loses the single-instance lock, and each runner's `dev-electron.mjs` kills every dev app of the checkout by name on each rebuild. That made the app steal focus and closed its window. Blocking the second runner was the follow-up chosen after the focus fix.
+
 ## 2026-11-12 — A second launch exits cleanly, so dev desktop stops stealing focus
 
 **What:** When T3 Code starts while another copy already holds the single-instance lock, the new copy now exits with code 0 instead of 130 (quit plus an Effect interrupt). The dev runner (`apps/desktop/scripts/dev-electron.mjs`) treats any non-zero exit as a crash and relaunches 120 ms later. So with two `dev:desktop` runners on one checkout, the losing copy relaunched about once a second, forever. Each relaunch fired `second-instance` in the running app, which reveals its window with `app.focus({ steal: true })` on macOS. The logs show about 370 focus grabs in 5 minutes. Key files: `apps/desktop/src/app/DesktopClerk.ts`, `apps/desktop/src/app/DesktopClerk.test.ts`.
