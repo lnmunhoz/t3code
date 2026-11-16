@@ -1,5 +1,11 @@
 import "~/index.css";
-import { EnvironmentId, ProviderDriverKind, ThreadId, TurnItemId } from "@t3tools/contracts";
+import {
+  EnvironmentId,
+  type OrchestrationV2BackgroundProgress,
+  ProviderDriverKind,
+  ThreadId,
+  TurnItemId,
+} from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import { expect, it, vi } from "vite-plus/test";
 import { page } from "vite-plus/test/browser";
@@ -37,6 +43,7 @@ it("opens full command details for short labels and keeps pending tasks current"
     description?: string,
     status: "running" | "completed" = "completed",
     explicitItem = true,
+    progress: OrchestrationV2BackgroundProgress = [],
   ) => (
     <ThreadNow
       attention={null}
@@ -55,6 +62,7 @@ it("opens full command details for short labels and keeps pending tasks current"
             awaited: true,
           },
         ],
+        progress,
         turnItems: [
           commandItem(status),
           {
@@ -94,4 +102,15 @@ it("opens full command details for short labels and keeps pending tasks current"
   await expect.element(page.getByText("Command output stream")).toBeVisible();
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
+
+  await screen.rerender(
+    view("Run tests", "completed", true, [
+      { taskId: "other-task", label: "Elsewhere", done: 1, total: 2 },
+      { taskId: "native-task", label: "Unit tests", done: 412, total: 1484 },
+    ]),
+  );
+  await expect.element(page.getByText("Unit tests 412 / 1,484")).toBeVisible();
+  await expect
+    .element(page.getByRole("progressbar", { name: "Unit tests" }))
+    .toHaveAttribute("aria-valuenow", "412");
 });

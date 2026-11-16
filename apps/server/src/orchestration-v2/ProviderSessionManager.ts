@@ -6,6 +6,8 @@ import {
   ModelSelection,
   OrchestrationV2DomainEvent,
   OrchestrationV2ProviderSession,
+  type OrchestrationV2BackgroundProgress,
+  type OrchestrationV2BackgroundTaskProgress,
   type OrchestrationV2PromptSuggestion,
   type OrchestrationV2ProviderThread,
   OrchestrationV2RuntimeRequest,
@@ -68,6 +70,39 @@ const busyTurnKey = (providerThreadId: ProviderThreadId, runOrdinal: number) =>
 const UNLOAD_THREAD_TIMEOUT_MS = 10 * 1000;
 /** Suggestions outlive their sessions, so keep only the most recently updated threads. */
 const MAX_PROMPT_SUGGESTIONS = 256;
+const MAX_BACKGROUND_PROGRESS_THREADS = 256;
+
+type BackgroundProgressStore = ReadonlyMap<
+  ThreadId,
+  ReadonlyMap<string, OrchestrationV2BackgroundTaskProgress>
+>;
+
+const EMPTY_BACKGROUND_PROGRESS: OrchestrationV2BackgroundProgress = [];
+
+/** Sets or clears one task's progress; the most recently reporting threads are kept. */
+function applyBackgroundProgress(
+  current: BackgroundProgressStore,
+  update: {
+    readonly threadId: ThreadId;
+    readonly taskId: string;
+    readonly progress: OrchestrationV2BackgroundTaskProgress | null;
+  },
+): BackgroundProgressStore {
+  const tasks = new Map(current.get(update.threadId));
+  if (update.progress === null) {
+    if (!tasks.delete(update.taskId)) return current;
+  } else {
+    tasks.set(update.taskId, update.progress);
+  }
+  const next = new Map(current);
+  next.delete(update.threadId);
+  if (tasks.size > 0) next.set(update.threadId, tasks);
+  for (const threadId of next.keys()) {
+    if (next.size <= MAX_BACKGROUND_PROGRESS_THREADS) break;
+    next.delete(threadId);
+  }
+  return next;
+}
 const WORKING_RUN_STATUSES: ReadonlySet<string> = new Set([
   "preparing",
   "starting",
@@ -216,6 +251,10 @@ export interface ProviderSessionManagerV2Shape {
   readonly subscribePromptSuggestion: (
     threadId: ThreadId,
   ) => Stream.Stream<OrchestrationV2PromptSuggestion>;
+  /** Progress lines of the thread's running background commands, then each change. */
+  readonly subscribeBackgroundProgress: (
+    threadId: ThreadId,
+  ) => Stream.Stream<OrchestrationV2BackgroundProgress>;
 }
 
 export class ProviderSessionManagerV2 extends Context.Service<
@@ -362,6 +401,9 @@ export const layerWithOptions = (
       const promptSuggestionStore = yield* SubscriptionRef.make<
         ReadonlyMap<ThreadId, NonNullable<OrchestrationV2PromptSuggestion>>
       >(new Map());
+      const backgroundProgressStore = yield* SubscriptionRef.make<BackgroundProgressStore>(
+        new Map(),
+      );
       const idAllocator = yield* IdAllocator.IdAllocatorV2;
       const providerEventIngestor = yield* ProviderEventIngestor.ProviderEventIngestorV2;
       const projectionStore = yield* ProjectionStore.ProjectionStoreV2;
@@ -2225,6 +2267,11 @@ export const layerWithOptions = (
                 return next;
               });
             }
+            if (event.type === "background_progress.updated") {
+              return SubscriptionRef.update(backgroundProgressStore, (current) =>
+                applyBackgroundProgress(current, event),
+              );
+            }
             const releaseLiveOutput =
               event.type === "turn_item.updated" &&
               event.turnItem.type === "command_execution" &&
@@ -2865,6 +2912,14 @@ export const layerWithOptions = (
                   ),
             ),
             Stream.changes,
+          ),
+        subscribeBackgroundProgress: (threadId) =>
+          SubscriptionRef.changes(backgroundProgressStore).pipe(
+            Stream.map((store) => store.get(threadId)),
+            Stream.changes,
+            Stream.map((tasks) =>
+              tasks === undefined ? EMPTY_BACKGROUND_PROGRESS : Array.from(tasks.values()),
+            ),
           ),
       } satisfies ProviderSessionManagerV2Shape);
     }),
