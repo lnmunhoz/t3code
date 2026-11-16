@@ -93,6 +93,27 @@ export function makeBackgroundProgressReader() {
   };
 }
 
+const STDOUT_REDIRECT = /(?:^|[\s;&|(])(?:1|&)?>>?\|?[ \t]*("[^"]+"|'[^']+'|[^\s;&|<>()]+)/gu;
+const TEE_TARGET = /(?:^|[\s;&|(])tee(?:[ \t]+-[A-Za-z]+)*[ \t]+("[^"]+"|'[^']+'|[^\s;&|<>()]+)/gu;
+
+/**
+ * Files a shell command sends its stdout to (`> log`, `>> log`, `&> log`, `| tee log`), so progress
+ * still shows when an agent writes a background command's output to its own log. Targets that need
+ * the shell to expand them (`$LOG`, `~/log`, a subshell) and devices are left out.
+ */
+export function backgroundCommandOutputFiles(command: string): ReadonlyArray<string> {
+  const targets = [...command.matchAll(STDOUT_REDIRECT), ...command.matchAll(TEE_TARGET)]
+    .map((match) => match[1]?.replace(/^(["'])(.*)\1$/u, "$2") ?? "")
+    .filter(
+      (target) =>
+        target.length > 0 &&
+        !/[$`]/u.test(target) &&
+        !target.startsWith("~") &&
+        !target.startsWith("/dev/"),
+    );
+  return [...new Set(targets)];
+}
+
 export function sameBackgroundProgress(
   left: BackgroundProgressLine | null,
   right: BackgroundProgressLine | null,

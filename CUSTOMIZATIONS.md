@@ -6,6 +6,12 @@ Each entry: date, title, what changed, and why.
 
 ---
 
+## 2026-11-16 — Background progress follows a command's log file
+
+**What:** When a background Bash command sends its output to a file (`npm run test:linux > linux.log 2>&1`, `>>`, `&>` or `| tee`), the progress reader now also reads that file, beside the task's own output, which stays empty until such a command ends. Key files: `apps/server/src/orchestration-v2/BackgroundProgress.ts` (`backgroundCommandOutputFiles`), `Adapters/ClaudeTaskOutputTail.ts` (`watchClaudeTaskProgress` takes `outputFiles`), `Adapters/ClaudeAdapterV2.ts` (resolves them against the thread's folder), `docs/user/providers-claude.md`.
+
+**Why:** After the merge, a chat running the focus-extension container tests still showed "Waiting on 2 commands" with no bar. The run was printing `::progress:: 45/104 E2E`, but the agent had written its output to its own log, so T3 Code read nothing. Asked to debug why.
+
 ## 2026-11-16 — Background command progress merged into local/custom
 
 **What:** Merged `feat/background-command-progress` (the two 2026-11-14 entries below: background command progress above the chat, and reading Playwright and Node test counts). The work had stayed on its own branch, so the running app never had it.

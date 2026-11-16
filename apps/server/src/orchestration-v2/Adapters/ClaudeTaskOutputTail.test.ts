@@ -174,6 +174,36 @@ describe("watchClaudeTaskProgress", () => {
       }),
     ).pipe(Effect.provide(NodeServices.layer)),
   );
+
+  it.live("reads progress from the file the command writes its output to", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const { root, tasks, file } = yield* makeTaskFile;
+        yield* fileSystem.makeDirectory(tasks, { recursive: true });
+        // `npm test > linux.log 2>&1` leaves the task's own output empty until the command ends.
+        yield* fileSystem.writeFileString(file, "");
+        const log = path.join(root, "linux.log");
+        yield* fileSystem.writeFileString(log, "::progress:: 12/104 E2E\n");
+        const reports = yield* Queue.unbounded<BackgroundProgressLine | null>();
+        const stop = yield* Deferred.make<void>();
+        const fiber = yield* watchClaudeTaskProgress({
+          root,
+          sessionId: SESSION_ID,
+          taskId: TASK_ID,
+          outputFiles: [log, path.join(root, "never-written.log")],
+          stop,
+          onProgress: (progress) => Queue.offer(reports, progress),
+        }).pipe(Effect.forkScoped);
+        assert.deepEqual(yield* Queue.take(reports), { done: 12, total: 104, label: "E2E" });
+
+        yield* Deferred.succeed(stop, undefined);
+        yield* Fiber.join(fiber);
+        assert.isNull(yield* Queue.take(reports));
+      }),
+    ).pipe(Effect.provide(NodeServices.layer)),
+  );
 });
 
 describe("claudeTaskOutputRoot", () => {

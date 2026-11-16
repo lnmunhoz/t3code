@@ -16,6 +16,7 @@ import {
   formatSearchToolLabel,
 } from "@t3tools/shared/toolActivity";
 import { field, text } from "../unknownField.ts";
+import { backgroundCommandOutputFiles } from "../BackgroundProgress.ts";
 import { mergeWorkflowAgentMetadata, type WorkflowAgentMetadata } from "../workflowAgentAnswers.ts";
 import {
   initialWorkflowAgentTranscriptCursor,
@@ -9618,10 +9619,16 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                   nativeThreadId: liveQuery.nativeThreadId,
                   stop,
                 });
+                const command = text(field(tailedCall?.input, "command"));
+                const cwd = path.resolve(context.input.runtimePolicy.cwd ?? ".");
                 yield* watchClaudeTaskProgress({
                   root: liveQuery.taskOutputRoot,
                   sessionId: message.session_id,
                   taskId,
+                  outputFiles: (command === undefined
+                    ? []
+                    : backgroundCommandOutputFiles(command)
+                  ).map((target) => path.resolve(cwd, target)),
                   stop,
                   onProgress: (progress) =>
                     emitProviderEvent({
