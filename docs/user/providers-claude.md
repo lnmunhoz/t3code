@@ -157,6 +157,10 @@ Commands that print no such lines still show progress when they run Playwright (
 its tests are done) or Node's built-in test runner (how many tests have finished). Vitest
 prints nothing until it finishes, so a Vitest run needs its own progress lines.
 
+Progress is read from a file too when the command sends its output there with `> run.log`,
+`>> run.log`, `&> run.log` or `| tee run.log`. A file named through a variable (`> $LOG`) or
+`~` is not followed.
+
 ## OpenRouter
 
 Create a Claude instance with its own config directory, such as

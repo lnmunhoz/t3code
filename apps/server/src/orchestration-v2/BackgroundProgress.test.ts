@@ -1,6 +1,10 @@
 import { assert, describe, it } from "@effect/vitest";
 
-import { makeBackgroundProgressReader, parseBackgroundProgressLine } from "./BackgroundProgress.ts";
+import {
+  backgroundCommandOutputFiles,
+  makeBackgroundProgressReader,
+  parseBackgroundProgressLine,
+} from "./BackgroundProgress.ts";
 
 const latestBackgroundProgress = (text: string) => makeBackgroundProgressReader()(text);
 
@@ -80,5 +84,28 @@ describe("makeBackgroundProgressReader", () => {
       label: "E2E",
     });
     assert.isUndefined(own("  ✓  5 [chromium] › e2e/a.spec.ts:9:1 › y\n"));
+  });
+});
+
+describe("backgroundCommandOutputFiles", () => {
+  it("finds the files a command sends its stdout to", () => {
+    const cases: ReadonlyArray<readonly [string, ReadonlyArray<string>]> = [
+      [
+        "npm run test:linux > /tmp/s/linux.log 2>&1; echo EXIT $?; tail -25 /tmp/s/linux.log",
+        ["/tmp/s/linux.log"],
+      ],
+      ["npm test >>run.log 2>/dev/null", ["run.log"]],
+      ["npm test &> run.log", ["run.log"]],
+      ["npm test 2>&1 | tee -a 'out dir/log.txt'", ["out dir/log.txt"]],
+      // Stderr alone, devices, and targets the shell must expand are not followed.
+      ["npm test 2>err.log", []],
+      ["npm test >/dev/null 2>&1", []],
+      ["npm test > $LOG", []],
+      ["npm test > ~/run.log", []],
+      ["npm test | grep ok", []],
+    ];
+    for (const [command, expected] of cases) {
+      assert.deepEqual(backgroundCommandOutputFiles(command), expected, command);
+    }
   });
 });
