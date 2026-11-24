@@ -12,6 +12,8 @@ export interface ThreadNowItem {
   readonly title: ReactNode;
   readonly description?: ReactNode;
   readonly actions?: ReactNode;
+  /** Rows under the line, such as the subagents it waits on. */
+  readonly body?: ReactNode;
 }
 
 /** Matches ThreadStatusLine, so every line at the end of the timeline reads as one family. */
@@ -31,10 +33,10 @@ function ThreadNowLine({
   /** Announces the line when it appears; only for something that needs the user. */
   readonly announce?: boolean;
 }) {
-  return (
+  const line = (
     <div
       role={announce ? "alert" : undefined}
-      className={cn(lineClassName, "items-baseline")}
+      className={cn(lineClassName, "items-baseline", item.body ? "pb-1" : null)}
       data-thread-now-line="true"
     >
       <span aria-hidden className="flex size-3.5 shrink-0 self-center items-center justify-center">
@@ -55,6 +57,15 @@ function ThreadNowLine({
         <span className="ms-1.5 flex shrink-0 items-baseline gap-2.5">{item.actions}</span>
       ) : null}
     </div>
+  );
+  if (!item.body) return line;
+  return (
+    <>
+      {line}
+      <div className="mx-auto w-full min-w-0 max-w-(--chat-content-max-width) px-1 pb-2">
+        {item.body}
+      </div>
+    </>
   );
 }
 

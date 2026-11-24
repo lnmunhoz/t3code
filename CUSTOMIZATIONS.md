@@ -6,6 +6,12 @@ Each entry: date, title, what changed, and why.
 
 ---
 
+## 2026-11-24 — "Waiting on subagents" above the chat lists each subagent like Lineage
+
+**What:** The line above the composer used to read "Waiting on 2 subagents" followed by a comma-separated list of names. It now keeps a short header and shows one row per subagent underneath, built from the same pieces as the Lineage rows in Thread details: provider icon with a status dot, title, elapsed time, the same hover card, and the same click behaviour (opens that thread). Past about four rows the list scrolls. Details only shows when commands are also running, since the rows already show what it did for subagents. Stop stays. No server or websocket changes. Key files: `apps/web/src/components/chat/BackgroundSubagentRows.tsx` (new), `ThreadActivityBanners.tsx`, `ThreadNow.tsx`, `useThreadLifecycle.tsx`.
+
+**Why:** "Instead of showing this waiting for two subagents like this without much information, can we show it the same way that it shows in the toggle thread details, like with the icon and everything above my chat, that would be much more clear for me what's going on behind the scenes."
+
 ## 2026-11-24 — Settings reopens on the last page you were on, uncommitted
 
 **What:** Opening Settings (sidebar, command palette, `/settings`) used to always redirect to General. The settings route now remembers the last settings page this device showed (localStorage key `t3code:last-settings-path:v1`, checked against the known settings pages) and redirects there instead, falling back to General. Hover preloads don't count as a visit. Key files: `apps/web/src/routes/_chat.settings.tsx`, `apps/web/src/components/settings/lastSettingsPath.ts`.

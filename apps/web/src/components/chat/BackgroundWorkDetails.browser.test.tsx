@@ -115,7 +115,8 @@ it("opens full command details for short labels and keeps pending tasks current"
     .toHaveAttribute("aria-valuenow", "412");
 });
 
-it("gives a subagent the same status as the background work line", async () => {
+it("lists a waited-on subagent as a row that opens its thread", async () => {
+  const onOpenThread = vi.fn();
   await using screen = await render(
     <ThreadNow
       attention={null}
@@ -137,13 +138,14 @@ it("gives a subagent the same status as the background work line", async () => {
         stopDisabled: false,
         stopping: false,
         onStop: async () => undefined,
-        onOpenThread: () => undefined,
+        onOpenThread,
       })}
     />,
   );
-  await expect.element(page.getByText("Waiting · Review refactor diffs")).toBeVisible();
-  await screen.getByRole("button", { name: "Details", exact: true }).click();
+  await expect.element(page.getByText("Waiting on a subagent")).toBeVisible();
   await expect
-    .element(page.getByRole("dialog").getByText("Waiting", { exact: true }))
-    .toBeVisible();
+    .element(screen.getByRole("button", { name: "Details", exact: true }))
+    .not.toBeInTheDocument();
+  await screen.getByRole("button", { name: "Open Review refactor diffs chat" }).click();
+  expect(onOpenThread).toHaveBeenCalledWith(ThreadId.make("child"), "primary");
 });

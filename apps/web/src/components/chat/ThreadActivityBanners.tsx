@@ -245,7 +245,7 @@ export function backgroundWorkNowItem(
     readonly stopDisabled: boolean;
     readonly stopping: boolean;
     readonly onStop: () => Promise<void>;
-    readonly onOpenThread: (threadId: ThreadId) => void;
+    readonly onOpenThread: (threadId: ThreadId, intent?: SideThreadOpenIntent) => void;
   },
   resolve: MessageResolver = m,
 ): ThreadNowItem | null {
@@ -254,8 +254,8 @@ export function backgroundWorkNowItem(
   if (presentation === null) return null;
   const progressByTaskId = new Map(input.progress.map((progress) => [progress.taskId, progress]));
   const rows = presentation.items.map((task) => {
-    const itemKey =
-      input.tasks.find((pending) => pending.taskId === task.taskId)?.nativeItemId ?? task.taskId;
+    const pending = input.tasks.find((candidate) => candidate.taskId === task.taskId);
+    const itemKey = pending?.nativeItemId ?? task.taskId;
     // Same key derivePendingBackgroundWork gives turn-item tasks; subagent items carry progress.
     const item = input.turnItems.findLast(
       (candidate) => (candidate.nativeItemRef?.nativeId || candidate.id) === itemKey,
@@ -264,6 +264,21 @@ export function backgroundWorkNowItem(
     const progress = progressByTaskId.get(task.taskId);
     return {
       task,
+      subagentRow:
+        task.kind === "subagent"
+          ? ({
+              taskId: task.taskId,
+              title: task.label,
+              childThreadId: task.childThreadId ?? subagent?.childThreadId ?? null,
+              driver: subagent?.driver,
+              providerInstanceId:
+                (pending?.kind === "subagent" ? pending.providerInstanceId : undefined) ??
+                subagent?.providerInstanceId,
+              origin: subagent?.origin ?? "provider_native",
+              startedAt: item?.startedAt ? DateTime.formatIso(item.startedAt) : null,
+              progress: subagent?.progress?.trim() || null,
+            } satisfies BackgroundSubagentRow)
+          : null,
       label:
         item?.type === "command_execution" && commandDisplayText(item.input) === task.label ? (
           <span className="font-mono in-data-[slot=popover-popup]:whitespace-pre-wrap">
@@ -298,12 +313,9 @@ export function backgroundWorkNowItem(
     id: `background-work:${input.threadId}`,
     icon: rows.every(isCommand) ? <TerminalIcon /> : <CircleDashedIcon />,
     title:
+      // The row names a lone subagent, so the line only says what the thread is doing.
       subagentRows.length > 0 && rows.length === 1 ? (
-        presentation.waiting ? (
-          resolve(msg("Waiting on a subagent"))
-        ) : (
-          resolve(msg("Running a subagent"))
-        )
+        resolve(presentation.waiting ? msg("Waiting on a subagent") : msg("Running a subagent"))
       ) : subagentRows.length > 0 ? (
         presentation.title
       ) : only && typeof only.label !== "string" && only.task.label !== only.task.kind ? (
