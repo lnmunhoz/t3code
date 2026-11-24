@@ -6,6 +6,12 @@ Each entry: date, title, what changed, and why.
 
 ---
 
+## 2026-11-24 — Settings reopens on the last page you were on, uncommitted
+
+**What:** Opening Settings (sidebar, command palette, `/settings`) used to always redirect to General. The settings route now remembers the last settings page this device showed (localStorage key `t3code:last-settings-path:v1`, checked against the known settings pages) and redirects there instead, falling back to General. Hover preloads don't count as a visit. Key files: `apps/web/src/routes/_chat.settings.tsx`, `apps/web/src/components/settings/lastSettingsPath.ts`.
+
+**Why:** "Every time I open T3 Code settings it doesn't save where I was in the settings and this is pretty annoying." Wanted reopening Settings to go back to the same place.
+
 ## 2026-11-24 — "T3 Dev" runs this checkout's client against T3 Code Stable's server
 
 **What:** `vp run install:mac-launcher` now installs `~/Applications/T3 Dev.app` in place of "T3 Code Custom" (which it removes; named so that typing "T3 Code" in Spotlight only matches Stable). Opening it starts T3 Code Stable if its server isn't up, starts `vp run dev:web --port 3773` with `T3CODE_PORT_OFFSET=40` (web client on `http://localhost:5773`, logging to `~/Library/Logs/t3code-dev.log`) unless it's already running, and opens it in a Chrome app window with its own profile (`~/Library/Application Support/t3code-dev-web`). The first open, and again every 25 days since sessions last 30, signs that profile in with `~/.t3/bin/t3 pair`. Dev therefore shows the same projects, threads and settings as Stable. Client changes show up live; server changes only reach it after `vp run install:stable`. T3 Code Stable now pins its server to port 3773 (`T3CODE_PORT` in its `LSEnvironment`). Key files: `scripts/install-mac-launcher.sh`, `scripts/install-stable-app.sh`.

@@ -27,6 +27,10 @@ import {
   isSettingsSearchScopeAvailable,
   movedSettingsPath,
 } from "../components/settings/settingsSearch";
+import {
+  readLastSettingsPath,
+  saveLastSettingsPath,
+} from "../components/settings/lastSettingsPath";
 
 function RestoreDeviceDefaultsButton({ onRestored }: { onRestored: () => void }) {
   const { changedSettingLabels, restoreDefaults } = useSettingsRestore(onRestored);
@@ -190,12 +194,13 @@ function SettingsRouteLayout() {
 export const Route = createFileRoute("/_chat/settings")({
   validateSearch: validateSettingsRouteSearch,
   search: { middlewares: [retainSettingsScope] },
-  beforeLoad: async ({ location }) => {
+  beforeLoad: async ({ location, preload }) => {
     if (location.pathname === "/settings") {
-      throw redirect({ to: "/settings/general", replace: true });
+      throw redirect({ to: readLastSettingsPath() ?? "/settings/general", replace: true });
     }
     const moved = movedSettingsPath(location.pathname, location.hash);
     if (moved) throw redirect({ to: moved, search: true, hash: true, replace: true });
+    if (!preload) saveLastSettingsPath(location.pathname);
   },
   component: SettingsRouteLayout,
 });
