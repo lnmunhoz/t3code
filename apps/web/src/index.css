@@ -578,6 +578,52 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   }
 }
 
+/* A file-tree guide from a project folder's icon into one of its thread rows: a 1px stem with an
+   elbow at the title line, which on the last row ends the stem. The 1px lap over the list's gap
+   keeps the stem unbroken between rows. */
+@utility sidebar-tree-branch {
+  --sidebar-tree-line: var(--color-sidebar-border);
+  --sidebar-tree-elbow: 1.1875rem;
+  position: relative;
+  margin-top: -1px;
+  padding-top: 1px;
+  &::after {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset-block: 0;
+    left: calc(var(--sidebar-row-content-inset) + 0.4375rem);
+    width: 0.625rem;
+    background-image:
+      linear-gradient(var(--sidebar-tree-line), var(--sidebar-tree-line)),
+      linear-gradient(var(--sidebar-tree-line), var(--sidebar-tree-line));
+    background-repeat: no-repeat;
+    background-size:
+      1px var(--sidebar-tree-stem, 100%),
+      100% 1px;
+    background-position:
+      0 0,
+      0 var(--sidebar-tree-elbow);
+  }
+}
+
+@utility sidebar-tree-last {
+  --sidebar-tree-stem: calc(var(--sidebar-tree-elbow) + 1px);
+}
+
+/* A finished thread you haven't opened: a few soft breaths of tint, then the row stays still. */
+@utility sidebar-unread-pulse {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: sidebar-unread-pulse 0.8s ease-in-out 3;
+  }
+}
+
+@keyframes sidebar-unread-pulse {
+  50% {
+    background-color: color-mix(in srgb, var(--color-success) 16%, transparent);
+  }
+}
+
 @utility visible-animate-spin {
   animation: var(--animate-spin);
   animation-play-state: var(--visible-animation-state, paused);

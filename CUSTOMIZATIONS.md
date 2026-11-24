@@ -6,6 +6,12 @@ Each entry: date, title, what changed, and why.
 
 ---
 
+## 2026-11-24 — Sidebar: tree guide lines, subagent status, unread pulse
+
+**What:** Four changes to the project folders in the boring sidebar. (1) Each thread row under an open folder draws a 1px tree guide from the folder's icon, with an elbow into the row; the last row ends the line (└). Pure CSS on the row's `<li>` (`sidebar-tree-branch` / `sidebar-tree-last` in `index.css`), hidden while a row is dragged. (2) A thread with background subagents running shows a bot icon and count beside the PR badge. (3) A thread parked on its subagents reads "Waiting on 2 subagents" (or "Waiting on a subagent") instead of "Waiting" in card rows, the status pill and the row's accessible label; narrow folder rows say "Subagents" and leave the count to the badge. Other waits still say "Waiting". (4) A finished thread you haven't opened breathes a green tint three times (0.8s each, CSS only, skipped under reduced motion), then keeps a static green dot on its tree elbow until you open it; settled threads stay quiet. The subagent count comes from the shell's existing `pendingBackgroundTasks` (the same list behind the "Waiting on N subagents" line above the chat), so no server or websocket changes. Key files: `apps/web/src/components/sidebar/SidebarThreadRow.tsx`, `apps/web/src/components/Sidebar.tsx`, `apps/web/src/components/Sidebar.logic.ts` (`countPendingSubagents`, status pill), `apps/web/src/index.css`.
+
+**Why:** Wanted to see which threads belong to a project at a glance, see which threads have subagents running and that "Waiting" means waiting on subagents, and have finished-but-unchecked threads gently draw attention so I know to check them.
+
 ## 2026-11-24 — The subagent list above the chat is collapsible and lines up with its header
 
 **What:** Follow-up to the entry below. "Waiting on N subagents" is now a toggle with a chevron: the list starts collapsed, a click expands the rows under it, and the open/closed choice is remembered on the device (localStorage `t3code:thread-now-body-open:v1`). The rows' icons now sit in the line's icon column and the titles start where the line's text does. Rows for delegated tasks, which have no turn item to time them, now show elapsed time from the child thread's current run. Key files: `apps/web/src/components/chat/ThreadNow.tsx`, `BackgroundSubagentRows.tsx`.

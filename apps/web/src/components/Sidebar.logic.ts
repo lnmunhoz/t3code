@@ -999,6 +999,16 @@ export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): Si
   return "ready";
 }
 
+/**
+ * Subagents still running for the thread. The shell lists them only once its own run has
+ * settled, so a thread that is still working reads 0 here.
+ */
+export function countPendingSubagents(
+  thread: Pick<ThreadStatusInput, "pendingBackgroundTasks">,
+): number {
+  return (thread.pendingBackgroundTasks ?? []).filter((task) => task.kind === "subagent").length;
+}
+
 /** Sidebar row status: a failure the user has already opened settles to ready, like Done. */
 export function resolveSidebarRowStatus(
   thread: ThreadStatusInput & SidebarThreadStatusInput,
@@ -1322,8 +1332,14 @@ export function resolveThreadStatusPill(input: {
     };
   }
 
+  const waitingSubagents = countPendingSubagents(thread);
   const waiting = {
-    label: msg("Waiting"),
+    label:
+      waitingSubagents > 0
+        ? msg("{count, plural, =1 {Waiting on a subagent} other {Waiting on {count} subagents}}", {
+            count: waitingSubagents,
+          })
+        : msg("Waiting"),
     colorClass: "text-sidebar-muted-foreground",
     dotClass: "bg-sidebar-muted-foreground",
     pulse: false,

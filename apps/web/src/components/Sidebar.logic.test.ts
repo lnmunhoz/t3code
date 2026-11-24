@@ -18,6 +18,7 @@ import {
   resolveSidebarRowStatus,
   resolveSidebarThreadStatus,
   resolveThreadStatusPill,
+  countPendingSubagents,
   resolveWindowTitleThreadStatus,
   resolveWorkingStartedAt,
   searchSidebarThreads,
@@ -47,6 +48,7 @@ import {
   sortPinnedThreadsByOrderKey,
 } from "@t3tools/client-runtime/state/thread-sort";
 import { resolveProjectExpanded } from "../uiStateStore";
+import { m } from "../i18n/messages";
 import { threadSearchMatchKey } from "@t3tools/client-runtime/state/thread-search";
 import { EnvironmentId, ProjectId, ProviderInstanceId, RunId, ThreadId } from "@t3tools/contracts";
 
@@ -520,6 +522,20 @@ describe("resolveThreadStatusPill", () => {
       dotClass: "bg-sidebar-muted-foreground",
       pulse: false,
     });
+  });
+
+  it("names the subagents an idle thread waits on, counting only subagents", () => {
+    const thread = {
+      ...baseThread,
+      pendingBackgroundTasks: [
+        { taskId: "agent-1", description: "Explore", kind: "subagent" },
+        { taskId: "agent-2", kind: "subagent" },
+        { taskId: "bg-1", description: "Watch build", kind: "monitor", awaited: true },
+      ],
+      runtime: { ...baseThread.runtime, status: "idle", activeRunId: null },
+    } as const;
+    expect(countPendingSubagents(thread)).toBe(2);
+    expect(m(resolveThreadStatusPill({ thread })!.label)).toBe("Waiting on 2 subagents");
   });
 
   it("shows plan ready when a settled plan turn has a proposed plan ready for follow-up", () => {
@@ -1046,6 +1062,13 @@ describe("unseen completion with background work", () => {
       receded: true,
       pill: "Waiting",
     },
+    {
+      roster: "background subagent",
+      task: { kind: "subagent" },
+      status: "waiting",
+      receded: true,
+      pill: "Waiting on a subagent",
+    },
   ] as const)("presents a completed thread with a $roster roster", (expected) => {
     const thread = presentThreadShell(localEnvironmentId, {
       ...makeThreadFixture().source,
@@ -1070,7 +1093,7 @@ describe("unseen completion with background work", () => {
       }),
     ).toBe(expected.receded);
     expect(isSidebarThreadWorking(thread)).toBe(expected.receded);
-    expect(resolveThreadStatusPill({ thread })).toMatchObject({ label: expected.pill });
+    expect(m(resolveThreadStatusPill({ thread })!.label)).toBe(expected.pill);
   });
 });
 

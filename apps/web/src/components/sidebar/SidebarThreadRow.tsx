@@ -41,6 +41,7 @@ import {
   AlarmClockIcon,
   AlarmClockOffIcon,
   ArrowRightLeftIcon,
+  BotIcon,
   CheckIcon,
   CircleAlertIcon,
   CircleCheckIcon,
@@ -89,6 +90,7 @@ import { textDirection } from "~/textDirection";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 import {
   animateSidebarLayoutChanges,
+  countPendingSubagents,
   hasUnseenCompletion,
   resolveSidebarRowAccessibility,
   type SidebarDropVerb,
@@ -578,6 +580,8 @@ type SidebarThreadRowProps = {
   // "folder" is a one-line row inside a boring sidebar project folder;
   // "folder-multiline" adds the card's branch and PR line under it.
   variant: "card" | "slim" | "folder" | "folder-multiline";
+  /** Folder rows draw a tree guide from the folder's icon; the last one ends it. */
+  treeBranch?: "middle" | "last" | undefined;
   navigationParent?: string | undefined;
   variantAction: SidebarSweepAction;
   settlementSupported: boolean;
@@ -768,6 +772,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
 
   const isUnread = hasUnseenCompletion({ ...thread, lastVisitedAt });
   const status = resolveSidebarRowStatus({ ...thread, lastVisitedAt });
+  const subagentCount = countPendingSubagents(thread);
+  const waitingOnSubagents = status === "waiting" && subagentCount > 0;
   const lastVisitedDate = lastVisitedAt === undefined ? null : parseTimestampDate(lastVisitedAt);
   const wokeAtDate = props.wokeAt === null ? null : parseTimestampDate(props.wokeAt);
   const isWoke =
@@ -795,7 +801,12 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
         }
       : status === "waiting"
         ? {
-            label: gt("Waiting", { $context: "thread status" }),
+            label: waitingOnSubagents
+              ? gt(
+                  "{count, plural, =1 {Waiting on a subagent} other {Waiting on {count} subagents}}",
+                  { count: subagentCount },
+                )
+              : gt("Waiting", { $context: "thread status" }),
             icon: "waiting" as const,
             className: "text-muted-foreground",
           }
@@ -843,6 +854,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                         }
                       : null;
   const isWokeStatus = topStatus?.icon === "woke";
+  // A settled thread was put away on purpose, so it stays quiet.
+  const showsUnreadCue =
+    topStatus?.icon === "done" && !props.isActive && variantAction !== "unsettle";
   const needsYou = !props.isActive && isSidebarAttentionStatus(status);
 
   const branchMismatch = resolveLocalCheckoutBranchMismatch({
@@ -1030,6 +1044,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     isFileDragOver && !props.isActive && !isSelected && "bg-sidebar-row-hover",
     props.sortable?.isDragging &&
       "bg-sidebar bg-linear-to-b from-sidebar-row-active to-sidebar-row-active text-sidebar-foreground opacity-100 shadow-lg",
+    // Remounts and each new unseen completion replay it; it runs a few times, then stops.
+    showsUnreadCue && "sidebar-unread-pulse",
   );
   const sortable = props.sortable;
   const sortableRootProps = sortable
@@ -1258,6 +1274,19 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     )
   ) : null;
 
+  const subagentBadge =
+    subagentCount > 0 ? (
+      <span
+        role="img"
+        aria-label={gt("{count, plural, one {{count} subagent} other {{count} subagents}}", {
+          count: subagentCount,
+        })}
+        className="inline-flex shrink-0 items-center gap-0.5 tabular-nums"
+      >
+        <BotIcon aria-hidden className="size-3 shrink-0" />
+        {subagentCount}
+      </span>
+    ) : null;
   const remoteMachineIcon =
     isRemote && !showsScratchMachine ? (
       <span className="inline-flex shrink-0 items-center text-sidebar-muted-foreground/70">
@@ -1271,6 +1300,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     !showsScratchMachine &&
     prBadge === null &&
     issueBadge === null &&
+    subagentBadge === null &&
     diff === null &&
     runningTerminalIds.length === 0;
   const metaLine = metaLineEmpty ? null : (
@@ -1295,6 +1325,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
         <span className="flex-1" />
       )}
       {terminalStatusIcon}
+      {subagentBadge}
       {prBadge}
       {issueBadge}
       {diff ? (
@@ -1336,6 +1367,10 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
         className={cn(
           "list-none [content-visibility:auto] [contain-intrinsic-size:auto_--spacing(9)]",
           metaLine !== null && multiline && "[contain-intrinsic-size:auto_--spacing(13.5)]",
+          inFolder &&
+            props.treeBranch !== undefined &&
+            !sortable?.isDragging &&
+            cn("sidebar-tree-branch", props.treeBranch === "last" && "sidebar-tree-last"),
           sortable?.isDragging && "relative z-20",
         )}
       >
@@ -1369,12 +1404,14 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           >
             {/* `contents` keeps one-line rows a single flex row. */}
             <div className={multiline ? "flex h-6 min-w-0 items-center gap-2.5" : "contents"}>
-              {needsYou ? (
+              {needsYou || (inFolder && showsUnreadCue) ? (
                 <span
                   aria-hidden
-                  data-testid="sidebar-row-needs-you"
+                  data-testid={needsYou ? "sidebar-row-needs-you" : "sidebar-row-unread"}
                   className={cn(
-                    "pointer-events-none absolute rounded-full bg-warning motion-safe:animate-status-pulse",
+                    // Above the folder's tree guide, so the dot sits on its elbow.
+                    "pointer-events-none absolute z-1 rounded-full",
+                    needsYou ? "bg-warning motion-safe:animate-status-pulse" : "bg-success",
                     inFolder ? "left-3.5 size-2" : "left-0.5 size-1.5",
                     multiline ? "top-3.5" : "top-1/2 -translate-y-1/2",
                   )}
@@ -1398,6 +1435,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               {multiline ? titleLineIcons : null}
               {pinIndicator}
               {multiline ? null : terminalStatusIcon}
+              {multiline ? null : subagentBadge}
               {multiline ? null : issueBadge}
               {isRegeneratingTitle ? (
                 <span role="status" className="sr-only">
@@ -1456,7 +1494,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                         )}
                       >
                         <TopStatusIcon icon={topStatus.icon} className="size-3" />
-                        {topStatus.label}
+                        {/* Folder rows are narrow; the meta line's badge carries the count. */}
+                        {waitingOnSubagents ? gt("Subagents") : topStatus.label}
                       </span>
                     ) : (
                       <span className="text-xs">
