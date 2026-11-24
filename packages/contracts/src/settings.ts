@@ -136,6 +136,38 @@ export const ArchiveComboSoundSettings = Schema.Struct({
 });
 export type ArchiveComboSoundSettings = typeof ArchiveComboSoundSettings.Type;
 
+export const MUSIC_BARS_BOUNDS = {
+  sensitivity: { min: 25, max: 200 },
+  reach: { min: 16, max: 320 },
+  visibility: { min: 5, max: 100 },
+  falloffMs: { min: 0, max: 300 },
+  density: { min: 40, max: 240 },
+} as const;
+export const DEFAULT_MUSIC_BARS = {
+  position: "left",
+  sensitivity: 100,
+  reach: 48,
+  visibility: 60,
+  falloffMs: 60,
+  density: 120,
+} as const;
+const musicBarsNumber = (key: keyof typeof MUSIC_BARS_BOUNDS) =>
+  Schema.Int.check(
+    Schema.isBetween({ minimum: MUSIC_BARS_BOUNDS[key].min, maximum: MUSIC_BARS_BOUNDS[key].max }),
+  ).pipe(Schema.withDecodingDefault(Effect.succeed(DEFAULT_MUSIC_BARS[key])));
+// How the music bars look: which window edge, and Focus Dot's tuning sliders.
+export const MusicBarsSettings = Schema.Struct({
+  position: Schema.Literals(["left", "bottom"]).pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_MUSIC_BARS.position)),
+  ),
+  sensitivity: musicBarsNumber("sensitivity"),
+  reach: musicBarsNumber("reach"),
+  visibility: musicBarsNumber("visibility"),
+  falloffMs: musicBarsNumber("falloffMs"),
+  density: musicBarsNumber("density"),
+});
+export type MusicBarsSettings = typeof MusicBarsSettings.Type;
+
 export const MAX_SNOOZE_PRESET_MINUTES = 30 * 24 * 60;
 export const MAX_SNOOZE_PRESETS = 8;
 export const SnoozePresetDay = Schema.Literals([
@@ -574,6 +606,9 @@ export const ClientSettingsSchema = Schema.Struct({
   boringSidebarMultilineRows: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(false)),
   ),
+  // Device-local: draw Focus Dot's live music levels along the window edge.
+  musicBarsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  musicBars: MusicBarsSettings.pipe(Schema.withDecodingDefault(Effect.succeed(DEFAULT_MUSIC_BARS))),
   toolCallVisibility: ToolCallVisibility.pipe(
     Schema.withDecodingDefault(Effect.succeed("showAll" as const)),
   ),
@@ -2104,6 +2139,8 @@ export const ClientSettingsPatch = Schema.Struct({
   showSkillsInSlashMenu: Schema.optionalKey(Schema.Boolean),
   boringSidebarEnabled: Schema.optionalKey(Schema.Boolean),
   boringSidebarMultilineRows: Schema.optionalKey(Schema.Boolean),
+  musicBarsEnabled: Schema.optionalKey(Schema.Boolean),
+  musicBars: Schema.optionalKey(MusicBarsSettings),
   toolCallVisibility: Schema.optionalKey(ToolCallVisibility),
   threadDetailsUsageEnabled: Schema.optionalKey(Schema.Boolean),
   threadDetailsItems: Schema.optionalKey(Schema.Record(Schema.String, Schema.Boolean)),

@@ -1047,6 +1047,11 @@ export interface DesktopBridge {
   /** Dev desktop only: restart the app onto that newer server build. */
   restartForDevServerBuild?: () => Promise<void>;
   /**
+   * macOS desktop: Spotify and Apple Music's live 40-band spectrum (0 to 1, bass first) while
+   * subscribed; null when the meter stops. The native meter runs only while someone listens.
+   */
+  subscribeMusicLevels?: (listener: (spectrum: ReadonlyArray<number> | null) => void) => () => void;
+  /**
    * Renderer `window.focus()` cannot raise an Electron window, and on Wayland
    * only the main process can spend a notification click's activation token.
    */

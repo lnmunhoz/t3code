@@ -7,6 +7,7 @@ import { useT3ConnectAuthPrompt } from "../clerk/useT3ConnectAuthPrompt";
 import { Button } from "../ui/button";
 import { ArchiveComboSoundSettings } from "./ArchiveComboSoundSettings";
 import { ArchiveSuggestionSettings } from "./ArchiveSuggestionSettings";
+import { MusicBarsLookSettings } from "./MusicBarsSettings";
 import { Switch } from "../ui/switch";
 import { ScopedSwitch } from "./ScopedSwitch";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
@@ -27,6 +28,7 @@ export function LabsSettingsPanel() {
         <PromptSuggestionsRow />
         <SimlockHostsRow />
         <FastWorktreeCheckoutRow />
+        <MusicBarsRow />
       </SettingsSection>
       <SettingsSection id="archiving" title="Archiving">
         <ArchiveSuggestionSettings />
@@ -56,6 +58,26 @@ function BoringSidebarRow() {
           <BoringSidebarMultilineRow />
         </div>
       ) : null}
+    </SettingsRow>
+  );
+}
+
+function MusicBarsRow() {
+  const settings = useScopedSettings();
+  const updateSettings = useUpdateScopedSettings();
+  return (
+    <SettingsRow
+      {...searchableSetting("music-bars")}
+      description="While Spotify or Apple Music plays, show live bars along the left edge of the window. Desktop app on macOS; the first time, macOS asks to allow System Audio Recording."
+      control={
+        <Switch
+          checked={settings.musicBarsEnabled}
+          onCheckedChange={(checked) => updateSettings({ musicBarsEnabled: Boolean(checked) })}
+          aria-label="Music bars"
+        />
+      }
+    >
+      {settings.musicBarsEnabled ? <MusicBarsLookSettings /> : null}
     </SettingsRow>
   );
 }

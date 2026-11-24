@@ -476,6 +476,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["beta boring sidebar folder rows multiline branch pull request details"],
   },
   {
+    id: "music-bars",
+    title: "Music bars",
+    to: "/settings/labs",
+    searchTerms: [
+      "spotify apple music beats visualizer audio levels spectrum equalizer position bottom left sensitivity reach visibility falloff density",
+    ],
+  },
+  {
     id: "idle-archive-suggestions",
     title: "Suggest archiving idle threads",
     to: "/settings/labs",

@@ -121,6 +121,16 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     return () => ipcRenderer.removeListener(IpcChannels.DEV_SERVER_BUILD_READY_CHANNEL, handler);
   },
   restartForDevServerBuild: () => ipcRenderer.invoke(IpcChannels.DEV_SERVER_BUILD_RESTART_CHANNEL),
+  subscribeMusicLevels: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, spectrum: unknown) =>
+      listener(Array.isArray(spectrum) ? spectrum : null);
+    ipcRenderer.on(IpcChannels.MUSIC_LEVELS_CHANNEL, handler);
+    void ipcRenderer.invoke(IpcChannels.MUSIC_LEVELS_SUBSCRIBE_CHANNEL, true);
+    return () => {
+      ipcRenderer.removeListener(IpcChannels.MUSIC_LEVELS_CHANNEL, handler);
+      void ipcRenderer.invoke(IpcChannels.MUSIC_LEVELS_SUBSCRIBE_CHANNEL, false);
+    };
+  },
   revealWindow: () => ipcRenderer.invoke(IpcChannels.REVEAL_WINDOW_CHANNEL),
   getSystemLocale: () => {
     const result = ipcRenderer.sendSync(IpcChannels.GET_SYSTEM_LOCALE_CHANNEL);
