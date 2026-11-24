@@ -49,6 +49,8 @@ import {
   FileDiff,
   Files,
   Globe2,
+  PinIcon,
+  ListTodo,
   MessagesSquare,
   Plus,
   TerminalSquare,
@@ -617,6 +619,8 @@ function surfaceTitle(
       return `#${surface.number}`;
     case "pull-requests":
       return resolve(msg("Linked items"));
+    case "tasks":
+      return resolve(msg("Tasks"));
     case "issue":
       // A git host numbers its issues; a tracker with keys of its own, such as Linear, names them.
       return /^\d+$/.test(surface.key) ? `#${surface.key}` : surface.key;
@@ -718,6 +722,8 @@ function SurfaceIcon({
       );
     case "pull-requests":
       return <PullRequestGlyph.link className="size-3 shrink-0" />;
+    case "tasks":
+      return <ListTodo className="size-3 shrink-0" />;
     case "issue":
       return <IssueSurfaceIcon surface={surface} environmentId={environmentId} />;
     case "thread":
@@ -951,6 +957,8 @@ function RightPanelTab(
     title: string;
     audio: TabAudioState;
     audioRuntimeTabId: string | null;
+    /** Fork: a browser tab pinned to the project, shown in each of its chats. */
+    pinned: boolean;
     previewUrl: string | null;
     previewCapturedUrl: string | null;
     theme: "light" | "dark";
@@ -1008,6 +1016,12 @@ function RightPanelTab(
           />
         ) : null}
       </PanelTabCloseButton>
+      {props.pinned ? (
+        <PinIcon
+          className="size-2.5 shrink-0 text-muted-foreground"
+          aria-label={gt("Pinned to project")}
+        />
+      ) : null}
       {audio === "none" || !audioRuntimeTabId ? null : (
         <Tooltip>
           <TooltipTrigger
@@ -1526,6 +1540,9 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                     )}
                     audioRuntimeTabId={
                       previewTabId ? (props.previewRuntimeTabId?.(previewTabId) ?? null) : null
+                    }
+                    pinned={
+                      previewTabId ? props.previewSessions[previewTabId]?.pinned === true : false
                     }
                     previewUrl={favicon.url}
                     previewCapturedUrl={favicon.capturedUrl}

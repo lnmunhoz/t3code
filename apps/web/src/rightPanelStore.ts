@@ -32,6 +32,7 @@ const RIGHT_PANEL_KINDS = [
   "issue",
   "thread",
   "linked-thread",
+  "tasks",
 ] as const;
 export type RightPanelKind = (typeof RIGHT_PANEL_KINDS)[number];
 
@@ -45,7 +46,13 @@ export interface DeviceTabTarget {
 }
 
 export type RightPanelSurface =
-  | { id: `browser:${string}`; kind: "preview"; resourceId: string }
+  | {
+      id: `browser:${string}`;
+      kind: "preview";
+      resourceId: string;
+      /** Fork: a tab pinned to the project and owned by another of its threads. */
+      ownerThreadId?: ThreadId;
+    }
   | { id: "browser:new"; kind: "preview"; resourceId: null }
   | { id: "device" | `device:${string}`; kind: "device"; target?: DeviceTabTarget; title?: string }
   | {
@@ -88,6 +95,8 @@ export type RightPanelSurface =
       detailTab?: PullRequestDetailTab;
     }
   | { id: "pull-requests"; kind: "pull-requests" }
+  /** Fork: the Tasks board project this chat's work is filed under. */
+  | { id: "tasks"; kind: "tasks" }
   /**
    * An issue opened in the issues list's shared panel, or beside a thread. Like `pull-request`,
    * the reference lives in the id so several issues can stay open as peer tabs.
@@ -252,6 +261,11 @@ interface RightPanelStoreState {
     tabIds: readonly string[],
     hiddenTabIds?: ReadonlySet<string>,
   ) => void;
+  /** Shows the project's pinned tabs owned by other threads, and drops unpinned ones. */
+  reconcilePinnedSurfaces: (
+    ref: ScopedThreadRef,
+    pins: ReadonlyArray<{ readonly ownerThreadId: ThreadId; readonly tabId: string }>,
+  ) => void;
   reconcileFileSurfaces: (ref: ScopedThreadRef, workspaceAvailable: boolean) => void;
   show: (ref: ScopedThreadRef) => void;
   close: (ref: ScopedThreadRef) => void;
@@ -297,10 +311,19 @@ const singletonSurface = (
       return { id: "files", kind };
     case "pull-requests":
       return { id: "pull-requests", kind };
+    case "tasks":
+      return { id: "tasks", kind };
     case "device":
       return { id: "device", kind };
   }
 };
+
+type PinnedSurface = Extract<RightPanelSurface, { resourceId: string; kind: "preview" }> & {
+  ownerThreadId: ThreadId;
+};
+
+export const isPinnedSurface = (surface: RightPanelSurface): surface is PinnedSurface =>
+  surface.kind === "preview" && "ownerThreadId" in surface && surface.ownerThreadId !== undefined;
 
 const browserSurface = (tabId: string | null): RightPanelSurface =>
   tabId
@@ -1231,6 +1254,36 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
             return { ...current, surfaces };
           }),
         ),
+      reconcilePinnedSurfaces: (ref, pins) =>
+        set((state) => {
+          const key = scopedThreadKey(ref);
+          const current = state.byThreadKey[key];
+          const wanted = new Map(pins.map((pin) => [`browser:${pin.tabId}`, pin]));
+          const surfaces = current?.surfaces ?? [];
+          const kept = surfaces.filter(
+            (surface) => !isPinnedSurface(surface) || wanted.has(surface.id),
+          );
+          const knownIds = new Set(kept.map((surface) => surface.id));
+          const added: RightPanelSurface[] = pins
+            .filter((pin) => !knownIds.has(`browser:${pin.tabId}`))
+            .map((pin) => ({
+              id: `browser:${pin.tabId}`,
+              kind: "preview",
+              resourceId: pin.tabId,
+              ownerThreadId: pin.ownerThreadId,
+            }));
+          if (added.length === 0 && kept.length === surfaces.length) return state;
+          return automaticUpdate(state, key, (thread) => {
+            const next = [...added, ...kept];
+            return {
+              ...thread,
+              surfaces: next,
+              activeSurfaceId: next.some((surface) => surface.id === thread.activeSurfaceId)
+                ? thread.activeSurfaceId
+                : (next[0]?.id ?? null),
+            };
+          });
+        }),
       reconcileBrowserSurfaces: (ref, tabIds, hiddenTabIds) =>
         set((state) =>
           automaticUpdate(state, scopedThreadKey(ref), (current) => {
@@ -1238,6 +1291,7 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
             const kept = current.surfaces.filter(
               (surface) =>
                 surface.kind !== "preview" ||
+                isPinnedSurface(surface) ||
                 (surface.id !== "browser:new" && validIds.has(surface.id)),
             );
             const knownIds = new Set(kept.map((surface) => surface.id));

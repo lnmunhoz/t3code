@@ -1,5 +1,5 @@
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
-import { useGT, useMessages } from "gt-react";
+import { T, useGT, useMessages } from "gt-react";
 import { useState, useSyncExternalStore } from "react";
 
 import type { ClientSettings, NotificationSpeechMode } from "@t3tools/contracts/settings";
@@ -133,16 +133,21 @@ export function NotificationSpeechSettings() {
   const soundOn = useScopedSettings((settings) => hasNotificationSound(settings.notificationMode));
   const updateSettings = useUpdateScopedSettings();
   const supported = canSpeakNotifications();
+  const gt = useGT();
 
   return (
     <SettingsRow
       {...searchableSetting("spoken-notifications")}
       description={
         !supported
-          ? "Text to speech is not available in this browser."
+          ? gt("Text to speech is not available in this browser.")
           : soundOn
-            ? "Say the thread title aloud, such as \u201cFix login bug complete\u201d or \u201cFix login bug needs approval\u201d."
-            : "Say the thread title aloud. Choose a thread notification mode with sound to hear it."
+            ? gt(
+                "Say the thread title aloud, such as \u201cFix login bug complete\u201d or \u201cFix login bug needs approval\u201d.",
+              )
+            : gt(
+                "Say the thread title aloud. Choose a thread notification mode with sound to hear it.",
+              )
       }
       control={
         <Select
@@ -154,7 +159,11 @@ export function NotificationSpeechSettings() {
             if (value !== "off") previewSpeech({ notificationSpeechMode: value });
           }}
         >
-          <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Spoken notifications">
+          <SelectTrigger
+            size="sm"
+            className="w-full sm:w-56"
+            aria-label={gt("Spoken notifications")}
+          >
             <SelectValue>{SPEECH_MODE_LABELS[speechMode]}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -176,13 +185,18 @@ export function NotificationSpeechVoiceSettings() {
   const speechOn = useScopedSettings((settings) => settings.notificationSpeechMode !== "off");
   const engine = useScopedSettings((settings) => settings.notificationSpeechEngine);
   const updateSettings = useUpdateScopedSettings();
+  const gt = useGT();
+  const m = useMessages();
   if (!canSpeakNotifications() || !speechOn) return null;
 
   return (
     <>
       <SettingsRow
         {...searchableSetting("spoken-notification-engine")}
-        description={`System voices are built into this device. Kokoro is a neural voice that runs locally; it downloads once (${KOKORO_DOWNLOAD_LABEL}) and stays offline afterwards.`}
+        description={gt(
+          "System voices are built into this device. Kokoro is a neural voice that runs locally; it downloads once ({size}) and stays offline afterwards.",
+          { size: m(KOKORO_DOWNLOAD_LABEL) },
+        )}
         control={
           <Select
             value={engine}
@@ -198,7 +212,7 @@ export function NotificationSpeechVoiceSettings() {
               }
             }}
           >
-            <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Voice engine">
+            <SelectTrigger size="sm" className="w-full sm:w-56" aria-label={gt("Voice engine")}>
               <SelectValue>{SPEECH_ENGINE_LABELS[engine]}</SelectValue>
             </SelectTrigger>
             <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -251,11 +265,14 @@ function SystemVoiceRow() {
     .filter((voice) => voice.lang.startsWith(language) || voice.voiceURI === voiceURI)
     .toSorted((a, b) => a.name.localeCompare(b.name));
   const selected = voices.find((voice) => voice.voiceURI === voiceURI);
+  const gt = useGT();
 
   return (
     <SettingsRow
       {...searchableSetting("spoken-notification-voice")}
-      description="Voices installed on this device. Add more in System Settings › Accessibility › Spoken Content › System voice › Manage Voices."
+      description={gt(
+        "Voices installed on this device. Add more in System Settings › Accessibility › Spoken Content › System voice › Manage Voices.",
+      )}
       control={
         <Select
           value={voiceURI || DEFAULT_VOICE}
@@ -266,12 +283,14 @@ function SystemVoiceRow() {
             previewSpeech({ notificationSpeechVoice: next });
           }}
         >
-          <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Notification voice">
-            <SelectValue>{selected ? selected.name : "Default"}</SelectValue>
+          <SelectTrigger size="sm" className="w-full sm:w-56" aria-label={gt("Notification voice")}>
+            <SelectValue>
+              {selected ? selected.name : gt("Default", { $context: "default system voice" })}
+            </SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
             <SelectItem hideIndicator value={DEFAULT_VOICE}>
-              Default
+              <T context="default system voice">Default</T>
             </SelectItem>
             {shown.map((voice) => (
               <SelectItem key={voice.voiceURI} hideIndicator value={voice.voiceURI}>
@@ -289,19 +308,27 @@ function KokoroModelRow() {
   const searchableSetting = useSearchableSetting();
   const state = useSyncExternalStore(subscribeKokoroState, getKokoroState);
   const downloaded = useSyncExternalStore(subscribeKokoroState, getKokoroDownloaded);
+  const gt = useGT();
+  const m = useMessages();
 
   const description =
     state.status === "loading"
       ? state.progress === null
-        ? "Loading the Kokoro model…"
-        : `Downloading the Kokoro model… ${Math.round(state.progress * 100)}%`
+        ? gt("Loading the Kokoro model…")
+        : gt("Downloading the Kokoro model… {percent}%", {
+            percent: Math.round(state.progress * 100),
+          })
       : state.status === "error"
-        ? `Kokoro failed to load: ${state.message}. Alerts use the system voice until it works.`
+        ? gt("Kokoro failed to load: {error}. Alerts use the system voice until it works.", {
+            error: state.message,
+          })
         : downloaded
           ? state.status === "ready"
-            ? "Downloaded and loaded. It unloads after 10 idle minutes to free memory."
-            : "Downloaded. It loads on the next alert."
-          : `Not downloaded yet (${KOKORO_DOWNLOAD_LABEL}). Alerts use the system voice until it is.`;
+            ? gt("Downloaded and loaded. It unloads after 10 idle minutes to free memory.")
+            : gt("Downloaded. It loads on the next alert.")
+          : gt("Not downloaded yet ({size}). Alerts use the system voice until it is.", {
+              size: m(KOKORO_DOWNLOAD_LABEL),
+            });
 
   return (
     <SettingsRow
@@ -316,7 +343,7 @@ function KokoroModelRow() {
               void removeKokoro();
             }}
           >
-            Remove download
+            <T>Remove download</T>
           </Button>
         ) : (
           <Button
@@ -329,7 +356,9 @@ function KokoroModelRow() {
                 .catch(() => undefined);
             }}
           >
-            {state.status === "error" ? "Retry download" : "Download"}
+            {state.status === "error"
+              ? gt("Retry download")
+              : gt("Download", { $context: "verb, downloads the voice model" })}
           </Button>
         )
       }
@@ -342,11 +371,13 @@ function KokoroVoiceRow() {
   const voice = useScopedSettings((settings) => settings.notificationSpeechKokoroVoice);
   const updateSettings = useUpdateScopedSettings();
   const selected = KOKORO_VOICES.find((entry) => entry.id === voice);
+  const gt = useGT();
+  const m = useMessages();
 
   return (
     <SettingsRow
       {...searchableSetting("spoken-notification-kokoro-voice")}
-      description="The Kokoro voice used for spoken alerts."
+      description={gt("The Kokoro voice used for spoken alerts.")}
       control={
         <Select
           value={voice}
@@ -359,13 +390,13 @@ function KokoroVoiceRow() {
             });
           }}
         >
-          <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Kokoro voice">
-            <SelectValue>{selected?.label ?? voice}</SelectValue>
+          <SelectTrigger size="sm" className="w-full sm:w-56" aria-label={gt("Kokoro voice")}>
+            <SelectValue>{selected ? m(selected.label) : voice}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
             {KOKORO_VOICES.map((entry) => (
               <SelectItem key={entry.id} hideIndicator value={entry.id}>
-                {entry.label}
+                {m(entry.label)}
               </SelectItem>
             ))}
           </SelectPopup>
@@ -379,11 +410,12 @@ function SpeechRateRow() {
   const searchableSetting = useSearchableSetting();
   const rate = useScopedSettings((settings) => settings.notificationSpeechRate);
   const updateSettings = useUpdateScopedSettings();
+  const gt = useGT();
 
   return (
     <SettingsRow
       {...searchableSetting("spoken-notification-rate")}
-      description="How fast alerts are spoken."
+      description={gt("How fast alerts are spoken.")}
       control={
         <Select
           value={String(rate)}
@@ -394,7 +426,7 @@ function SpeechRateRow() {
             previewSpeech({ notificationSpeechRate: next });
           }}
         >
-          <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Speech rate">
+          <SelectTrigger size="sm" className="w-full sm:w-56" aria-label={gt("Speech rate")}>
             <SelectValue>{`${rate}×`}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>

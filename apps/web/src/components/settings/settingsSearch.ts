@@ -513,23 +513,37 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("beta boring sidebar folder rows multiline branch pull request details")],
   },
   {
-    id: "idle-archive-suggestions",
-    title: "Suggest archiving idle threads",
+    id: "music-bars",
+    title: msg("Music bars"),
     to: "/settings/labs",
-    searchTerms: ["housekeeping cleanup archive idle inactive stale old threads sidebar hours"],
+    searchTerms: [
+      msg(
+        "spotify apple music beats visualizer audio levels spectrum equalizer position bottom left sensitivity reach visibility falloff density",
+      ),
+    ],
+  },
+  {
+    id: "idle-archive-suggestions",
+    title: msg("Suggest archiving idle threads"),
+    to: "/settings/labs",
+    searchTerms: [
+      msg("housekeeping cleanup archive idle inactive stale old threads sidebar hours"),
+    ],
   },
   {
     id: "idle-archive-hours",
-    title: "Hours idle before suggesting archive",
+    title: msg("Hours idle before suggesting archive"),
     to: "/settings/labs",
     targetId: "idle-archive-suggestions",
-    searchTerms: ["housekeeping cleanup archive idle inactive threshold timeout"],
+    searchTerms: [msg("housekeeping cleanup archive idle inactive threshold timeout")],
   },
   {
     id: "archive-combo-sound",
-    title: "Archive combo sound",
+    title: msg("Archive combo sound"),
     to: "/settings/labs",
-    searchTerms: ["game combo sound chime pitch archive idle threads housekeeping volume fanfare"],
+    searchTerms: [
+      msg("game combo sound chime pitch archive idle threads housekeeping volume fanfare"),
+    ],
   },
   {
     id: "tool-call-visibility",
@@ -794,10 +808,12 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "attention-global-shortcut",
-    title: "Jump to threads that need you",
+    title: msg("Jump to threads that need you"),
     to: "/settings/general",
     searchTerms: [
-      "global system-wide shortcut hotkey keybinding attention needs input approval done next thread",
+      msg(
+        "global system-wide shortcut hotkey keybinding attention needs input approval done next thread",
+      ),
     ],
   },
   {

@@ -1,6 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { SnapShotKeyChord } from "@t3tools/contracts";
 import { parseKeybindingShortcut } from "@t3tools/shared/keybindings";
+import { T, useGT } from "gt-react";
 import { useState, type KeyboardEvent } from "react";
 
 import { updateClientSettings, useClientSettings } from "../../hooks/useSettings";
@@ -26,25 +27,28 @@ export function AttentionShortcutSettings() {
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const [recording, setRecording] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const gt = useGT();
   if (!bridge) return null;
 
   const save = async (next: SnapShotKeyChord | null) => {
     setMessage(null);
     if (next !== null && (shortcut === null || !sameSnapShotShortcut(next, shortcut))) {
       if (sameSnapShotShortcut(next, snapShotShortcut)) {
-        setMessage("Snapshot already uses this shortcut.");
+        setMessage(gt("Snapshot already uses this shortcut."));
         return;
       }
       // The system-wide chord swallows the key inside T3 Code too, so only this command may share it.
       const conflict = snapShotKeybindingConflict(next, keybindings);
       if (conflict !== null && conflict !== "thread.nextAttention") {
-        setMessage(`${commandLabel(conflict)} already uses this shortcut.`);
+        setMessage(
+          gt("{command} already uses this shortcut.", { command: commandLabel(conflict) }),
+        );
         return;
       }
       const availability = await bridge.checkSnapShotShortcut(next).catch(() => null);
       if (availability !== null && !availability.available) {
         setMessage(
-          availability.message ?? "This shortcut is already used by the system or another app.",
+          availability.message ?? gt("This shortcut is already used by the system or another app."),
         );
         return;
       }
@@ -52,7 +56,7 @@ export function AttentionShortcutSettings() {
     try {
       await updateClientSettings({ attentionGlobalShortcut: next });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not save this shortcut.");
+      setMessage(error instanceof Error ? error.message : gt("Could not save this shortcut."));
     }
   };
 
@@ -79,20 +83,24 @@ export function AttentionShortcutSettings() {
       {...searchableSetting("attention-global-shortcut")}
       description={
         message ??
-        "From any app, bring T3 Code forward and open the next thread that needs you or finished since you last looked."
+        gt(
+          "From any app, bring T3 Code forward and open the next thread that needs you or finished since you last looked.",
+        )
       }
       control={
         <div className="flex items-center gap-1.5">
           {shortcut !== null && !recording ? (
             <Button type="button" size="xs" variant="ghost-muted" onClick={() => void save(null)}>
-              Clear
+              <T context="verb, removes the shortcut">Clear</T>
             </Button>
           ) : null}
           <Button
             type="button"
             size="xs"
             variant={recording ? "secondary" : "outline"}
-            aria-label={shortcut ? "Change system-wide shortcut" : "Set system-wide shortcut"}
+            aria-label={
+              shortcut ? gt("Change system-wide shortcut") : gt("Set system-wide shortcut")
+            }
             aria-pressed={recording}
             data-keybinding-capture=""
             onClick={() => {
@@ -103,11 +111,11 @@ export function AttentionShortcutSettings() {
             onBlur={() => setRecording(false)}
           >
             {recording ? (
-              "Press shortcut…"
+              gt("Press shortcut…")
             ) : shortcut ? (
               <SnapShotShortcutKeys shortcut={shortcut} />
             ) : (
-              "Set shortcut"
+              gt("Set shortcut")
             )}
           </Button>
         </div>

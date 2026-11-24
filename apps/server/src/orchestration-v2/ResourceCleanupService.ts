@@ -26,7 +26,10 @@ export class ResourceCleanupError extends Schema.TaggedError<ResourceCleanupErro
 export class ResourceCleanupService extends Context.Reference<{
   readonly cleanupScheduledTasks: (threadId: ThreadId) => Effect.Effect<void, ResourceCleanupError>;
   readonly cleanupTerminals: (threadId: string) => Effect.Effect<void, ResourceCleanupError>;
-  readonly cleanupPreviews: (threadId: string) => Effect.Effect<void, ResourceCleanupError>;
+  readonly cleanupPreviews: (
+    threadId: string,
+    options?: { readonly keepPinned?: boolean },
+  ) => Effect.Effect<void, ResourceCleanupError>;
   /** Releases the thread's device claims, as `device_close` does; the devices stay booted. */
   readonly cleanupDevices: (threadId: ThreadId) => Effect.Effect<void, ResourceCleanupError>;
   readonly cleanupAttachments: (
@@ -77,9 +80,10 @@ export const layer = Layer.effect(
       }),
       cleanupPreviews: Effect.fn("ResourceCleanupService.cleanupPreviews")(function (
         threadId: string,
+        options?: { readonly keepPinned?: boolean },
       ) {
         return previews
-          .close({ threadId: ThreadId.make(threadId) })
+          .close({ threadId: ThreadId.make(threadId), keepPinned: options?.keepPinned ?? false })
           .pipe(
             Effect.mapError(
               (cause) => new ResourceCleanupError({ operation: "preview", threadId, cause }),

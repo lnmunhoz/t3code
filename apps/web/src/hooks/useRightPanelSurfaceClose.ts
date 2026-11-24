@@ -15,6 +15,7 @@ import { focusPanelTerminalAfterClose } from "../lib/terminalFocus";
 import { readLocalApi } from "../localApi";
 import { setActivePreviewTab, useThreadPreviewState } from "../previewStateStore";
 import {
+  isPinnedSurface,
   selectActiveRightPanelSurface,
   selectThreadRightPanelState,
   useRightPanelStore,
@@ -38,6 +39,7 @@ export function useRightPanelSurfaceClose(input: {
 }) {
   const { threadRef, terminalLabelsById } = input;
   const closePreview = useAtomCommand(previewEnvironment.close, "preview close");
+  const adjustPreview = useAtomCommand(previewEnvironment.adjust, "preview unpin");
   const deleteThread = useAtomCommand(threadEnvironment.delete, "side chat delete");
   const canOperatePreview = useEnvironmentScope(
     threadRef?.environmentId ?? null,
@@ -52,7 +54,13 @@ export function useRightPanelSurfaceClose(input: {
 
   const releaseSurfaceResources = (ref: ScopedThreadRef, surface: RightPanelSurface) => {
     // Without preview access, server state remains until an authorized close or restart.
-    if (canOperatePreview && surface.kind === "preview" && surface.resourceId) {
+    // Another thread's pinned tab is unpinned rather than closed: its owner keeps it.
+    if (canOperatePreview && isPinnedSurface(surface)) {
+      void adjustPreview({
+        environmentId: ref.environmentId,
+        input: { threadId: surface.ownerThreadId, tabId: surface.resourceId, pinned: false },
+      });
+    } else if (canOperatePreview && surface.kind === "preview" && surface.resourceId) {
       void closePreviewSession({
         closePreview,
         snapshot: previewState.sessions[surface.resourceId] ?? null,

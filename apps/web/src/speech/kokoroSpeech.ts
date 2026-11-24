@@ -1,23 +1,25 @@
+import { msg } from "gt-react";
+
 import type { KokoroWorkerRequest, KokoroWorkerResponse } from "./kokoroProtocol";
 
 /** Curated English voices; grades are from the Kokoro model card. */
 export const KOKORO_VOICES = [
-  { id: "af_heart", label: "Heart · US female" },
-  { id: "af_bella", label: "Bella · US female" },
-  { id: "af_nicole", label: "Nicole · US female, soft" },
-  { id: "af_aoede", label: "Aoede · US female" },
-  { id: "af_kore", label: "Kore · US female" },
-  { id: "af_sarah", label: "Sarah · US female" },
-  { id: "am_michael", label: "Michael · US male" },
-  { id: "am_fenrir", label: "Fenrir · US male" },
-  { id: "am_puck", label: "Puck · US male" },
-  { id: "bf_emma", label: "Emma · UK female" },
-  { id: "bf_isabella", label: "Isabella · UK female" },
-  { id: "bm_george", label: "George · UK male" },
-  { id: "bm_fable", label: "Fable · UK male" },
+  { id: "af_heart", label: msg("Heart · US female") },
+  { id: "af_bella", label: msg("Bella · US female") },
+  { id: "af_nicole", label: msg("Nicole · US female, soft") },
+  { id: "af_aoede", label: msg("Aoede · US female") },
+  { id: "af_kore", label: msg("Kore · US female") },
+  { id: "af_sarah", label: msg("Sarah · US female") },
+  { id: "am_michael", label: msg("Michael · US male") },
+  { id: "am_fenrir", label: msg("Fenrir · US male") },
+  { id: "am_puck", label: msg("Puck · US male") },
+  { id: "bf_emma", label: msg("Emma · UK female") },
+  { id: "bf_isabella", label: msg("Isabella · UK female") },
+  { id: "bm_george", label: msg("George · UK male") },
+  { id: "bm_fable", label: msg("Fable · UK male") },
 ] as const;
 
-export const KOKORO_DOWNLOAD_LABEL = "about 330 MB, or 90 MB without GPU acceleration";
+export const KOKORO_DOWNLOAD_LABEL = msg("about 330 MB, or 90 MB without GPU acceleration");
 
 const MODEL_URL_PREFIX = "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/";
 const MODEL_FILE_URLS = [
@@ -99,6 +101,7 @@ function touch() {
 }
 
 function send(request: KokoroWorkerRequest) {
+  // oxlint-disable-next-line unicorn/require-post-message-target-origin -- Worker.postMessage has no targetOrigin
   worker?.postMessage(request);
 }
 

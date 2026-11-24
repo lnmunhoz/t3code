@@ -6,13 +6,13 @@ You can think of T3 Code as an open source "bring-your-own-subscription" alterna
 
 ## This is a custom fork
 
-This checkout is a personal, customized version of T3 Code, not upstream. Custom work lives on the `local/custom` branch on top of upstream `main`.
+This checkout is a personal, customized version of T3 Code, not upstream. Custom work lives on the `local/custom-nightly` branch, built on upstream T3 Code Nightly. The older `local/custom` branch (on upstream `main`) is kept on `fork` for history only.
 
 Every customization is recorded in [CUSTOMIZATIONS.md](CUSTOMIZATIONS.md) so we can always look back at what changed and why, especially when rebasing onto upstream:
 
 - When you make a change for the user, add an entry to `CUSTOMIZATIONS.md` in the same commit: the date (YYYY-MM-DD), a short title, what changed (key files), and the user's motivation in their own terms. If the motivation is unclear, ask.
 - Append new entries at the top. Never delete or rewrite history; if a customization is reverted or replaced, add a new entry saying so and why.
-- Remotes: `origin` is upstream (`pingdotgg/t3code`, never push there); `fork` is the user's public fork (`lnmunhoz/t3code`). A `.vite-hooks/post-commit` hook pushes `local/custom` to `fork` after each commit; if it reports a failure, push manually. When pulling upstream, also `git push fork main`.
+- Remotes: `origin` is upstream (`pingdotgg/t3code`, never push there); `fork` is the user's public fork (`lnmunhoz/t3code`). A `.vite-hooks/post-commit` hook pushes `local/custom-nightly` to `fork` after each commit; if it reports a failure, push manually. When pulling upstream, also `git push fork main`.
 - Customizations override the upstream-oriented guidance below where they conflict (for example, PRs and multi-surface coverage are not required unless the user asks).
 
 ## What makes T3 Code special?

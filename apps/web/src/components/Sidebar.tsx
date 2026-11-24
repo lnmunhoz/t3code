@@ -2745,8 +2745,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             toastManager.add(
               stackedThreadToast({
                 type: "error",
-                title: "Could not move thread",
-                description: error instanceof Error ? error.message : "An error occurred.",
+                title: gt("Could not move thread"),
+                description: error instanceof Error ? error.message : gt("An error occurred."),
               }),
             );
           }
@@ -2976,7 +2976,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     });
     const next = candidates.find((thread) => threadShellKey(thread) === nextKey);
     if (!next) {
-      toastManager.add({ type: "info", title: "Nothing else needs you right now" });
+      toastManager.add({ type: "info", title: gt("Nothing else needs you right now") });
       return;
     }
     navigateToThread(scopeThreadRef(next.environmentId, next.id));

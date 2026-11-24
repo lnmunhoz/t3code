@@ -3,6 +3,7 @@ import {
   ArchiveComboVoice,
   type ArchiveComboSoundSettings as ComboSettings,
 } from "@t3tools/contracts";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { PlayIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -26,10 +27,10 @@ const SCALE_LABELS = {
 } satisfies Record<ComboSettings["scale"], string>;
 const VOLUMES = [25, 50, 75, 100];
 const SPEEDS = [
-  { stepMs: 260, label: "Relaxed" },
-  { stepMs: 160, label: "Normal" },
-  { stepMs: 100, label: "Fast" },
-  { stepMs: 70, label: "Frantic" },
+  { stepMs: 260, label: msg("Relaxed", { $context: "combo sound speed" }) },
+  { stepMs: 160, label: msg("Normal", { $context: "combo sound speed" }) },
+  { stepMs: 100, label: msg("Fast", { $context: "combo sound speed" }) },
+  { stepMs: 70, label: msg("Frantic", { $context: "combo sound speed" }) },
 ];
 
 function save(next: ComboSettings, preview = true) {
@@ -73,29 +74,33 @@ function NestedRow(props: { title: string; description: string; control: ReactNo
 export function ArchiveComboSoundSettings() {
   const searchableSetting = useSearchableSetting();
   const settings = useClientSettings((current) => current.archiveComboSound);
-  const speedLabel =
-    SPEEDS.find((speed) => speed.stepMs === settings.stepMs)?.label ?? `${settings.stepMs} ms`;
+  const gt = useGT();
+  const m = useMessages();
+  const speed = SPEEDS.find((entry) => entry.stepMs === settings.stepMs);
+  const speedLabel = speed ? m(speed.label) : `${settings.stepMs} ms`;
   return (
     <SettingsRow
       {...searchableSetting("archive-combo-sound")}
-      description="Archiving idle threads from the sidebar card plays a sound that climbs with each thread, like a combo in a game."
+      description={gt(
+        "Archiving idle threads from the sidebar card plays a sound that climbs with each thread, like a combo in a game.",
+      )}
       control={
         <div className="flex items-center gap-2">
           <Button
             size="xs"
             variant="outline"
             onClick={() => previewArchiveCombo(settings)}
-            aria-label="Preview combo sound"
+            aria-label={gt("Preview combo sound")}
           >
             <PlayIcon />
-            Preview
+            <T context="verb, plays the sound">Preview</T>
           </Button>
           <Switch
             checked={settings.enabled}
             onCheckedChange={(checked) =>
               save({ ...settings, enabled: Boolean(checked) }, Boolean(checked))
             }
-            aria-label="Archive combo sound"
+            aria-label={gt("Archive combo sound")}
           />
         </div>
       }
@@ -103,11 +108,11 @@ export function ArchiveComboSoundSettings() {
       {settings.enabled ? (
         <div className="mt-2 mb-2 border-l-2 border-border/60 ps-3">
           <NestedRow
-            title="Sound"
-            description="The completion chime pitched up, or a synthesized coin or pop."
+            title={gt("Sound")}
+            description={gt("The completion chime pitched up, or a synthesized coin or pop.")}
             control={
               <ComboSelect
-                label="Combo sound"
+                label={gt("Combo sound")}
                 value={settings.voice}
                 display={VOICE_LABELS[settings.voice]}
                 options={ArchiveComboVoice.literals.map((voice) => ({
@@ -122,11 +127,11 @@ export function ArchiveComboSoundSettings() {
             }
           />
           <NestedRow
-            title="Volume"
-            description="Separate from notification sounds."
+            title={gt("Volume")}
+            description={gt("Separate from notification sounds.")}
             control={
               <ComboSelect
-                label="Combo volume"
+                label={gt("Combo volume")}
                 value={String(settings.volume)}
                 display={`${settings.volume}%`}
                 options={VOLUMES.map((volume) => ({ value: String(volume), label: `${volume}%` }))}
@@ -135,11 +140,13 @@ export function ArchiveComboSoundSettings() {
             }
           />
           <NestedRow
-            title="Scale"
-            description="The notes each hit climbs through. Long combos hold at two octaves up."
+            title={gt("Scale")}
+            description={gt(
+              "The notes each hit climbs through. Long combos hold at two octaves up.",
+            )}
             control={
               <ComboSelect
-                label="Combo scale"
+                label={gt("Combo scale")}
                 value={settings.scale}
                 display={SCALE_LABELS[settings.scale]}
                 options={ArchiveComboScale.literals.map((scale) => ({
@@ -154,29 +161,29 @@ export function ArchiveComboSoundSettings() {
             }
           />
           <NestedRow
-            title="Speed"
-            description="Time between archives. It speeds up as the combo grows."
+            title={gt("Speed")}
+            description={gt("Time between archives. It speeds up as the combo grows.")}
             control={
               <ComboSelect
-                label="Combo speed"
+                label={gt("Combo speed")}
                 value={String(settings.stepMs)}
                 display={speedLabel}
                 options={SPEEDS.map((speed) => ({
                   value: String(speed.stepMs),
-                  label: speed.label,
+                  label: m(speed.label),
                 }))}
                 onChange={(value) => save({ ...settings, stepMs: Number(value) })}
               />
             }
           />
           <NestedRow
-            title="Finishing chord"
-            description="Play the last archive as a bright chord instead of a single note."
+            title={gt("Finishing chord")}
+            description={gt("Play the last archive as a bright chord instead of a single note.")}
             control={
               <Switch
                 checked={settings.finale}
                 onCheckedChange={(checked) => save({ ...settings, finale: Boolean(checked) })}
-                aria-label="Finishing chord"
+                aria-label={gt("Finishing chord")}
               />
             }
           />

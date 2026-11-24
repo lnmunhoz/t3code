@@ -46,6 +46,7 @@ import * as ServerActivation from "../serverActivation.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as TerminalManager from "../terminal/Manager.ts";
 import * as ProjectStore from "./ProjectStore.ts";
+import * as ResourceCleanupService from "./ResourceCleanupService.ts";
 import * as Orchestrator from "./Orchestrator.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import * as ThreadSettlementService from "./ThreadSettlementService.ts";
@@ -622,6 +623,10 @@ const makeHarness = Effect.fn("makeThreadSettlementHarness")(function* (options:
   const domainEvents = yield* PubSub.unbounded<OrchestrationV2DomainEvent>();
   const observedEvents = yield* Queue.unbounded<EventId>();
   const closedIdle = yield* Queue.unbounded<{ readonly threadId: string }>();
+  const closedPreviews = yield* Queue.unbounded<{
+    readonly threadId: string;
+    readonly keepPinned: boolean | undefined;
+  }>();
   const scriptRuns =
     yield* Queue.unbounded<ProjectSetupScriptRunner.ProjectSetupScriptRunnerInput>();
 
@@ -742,6 +747,13 @@ const makeHarness = Effect.fn("makeThreadSettlementHarness")(function* (options:
         Queue.offer(closedIdle, input).pipe(Effect.andThen(options.onCloseIdle?.() ?? Effect.void)),
       hasActiveSubprocess: (input) => options.hasActiveSubprocess?.(input) ?? Effect.succeed(false),
     }),
+    Layer.succeed(ResourceCleanupService.ResourceCleanupService, {
+      ...ResourceCleanupService.ResourceCleanupService.defaultValue(),
+      cleanupPreviews: (threadId, options) =>
+        Queue.offer(closedPreviews, { threadId, keepPinned: options?.keepPinned }).pipe(
+          Effect.asVoid,
+        ),
+    }),
     Layer.mock(ProjectSetupScriptRunner.ProjectSetupScriptRunner)({
       runForThread: (input) =>
         Queue.offer(scriptRuns, input).pipe(
@@ -793,6 +805,7 @@ const makeHarness = Effect.fn("makeThreadSettlementHarness")(function* (options:
     summaryRecovery,
     invalidatedCwds,
     closedIdle,
+    closedPreviews,
     scriptRuns,
     observedEvents,
     publishEvent: (event: OrchestrationV2DomainEvent) => PubSub.publish(domainEvents, event),
@@ -1131,6 +1144,10 @@ describe("ThreadSettlementServiceV2 worker", () => {
           // Cleanup of the following event marks delivery of the run event before draining.
           yield* fixture.publishEvent(settledEvent(marker));
           expect(yield* Queue.take(fixture.closedIdle)).toEqual({ threadId: marker.id });
+          expect(yield* Queue.take(fixture.closedPreviews)).toEqual({
+            threadId: marker.id,
+            keepPinned: true,
+          });
           yield* service.drain;
           expect((yield* Ref.get(fixture.commands)).map((command) => command.threadId)).toEqual([
             empty.id,

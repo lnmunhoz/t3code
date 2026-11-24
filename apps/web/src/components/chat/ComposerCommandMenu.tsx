@@ -17,6 +17,8 @@ import {
 } from "@t3tools/contracts";
 import {
   BlocksIcon,
+  CircleDotIcon,
+  CircleHelpIcon,
   FolderIcon,
   MessagesSquareIcon,
   PackageIcon,
@@ -82,6 +84,15 @@ export type ComposerCommandItem =
       id: string;
       type: "thread";
       thread: ScopedThreadRef;
+      label: string;
+      description: string;
+    }
+  | {
+      id: string;
+      type: "task";
+      taskId: string;
+      taskText: string;
+      waiting: boolean;
       label: string;
       description: string;
     }
@@ -243,6 +254,13 @@ const ComposerCommandMenuItem = memo(function ComposerCommandMenuItem(props: {
       ) : null}
       {props.item.type === "thread" ? (
         <MessagesSquareIcon aria-hidden="true" className="size-4 shrink-0 text-secondary-label" />
+      ) : null}
+      {props.item.type === "task" ? (
+        props.item.waiting ? (
+          <CircleHelpIcon aria-hidden="true" className="size-4 shrink-0 text-warning" />
+        ) : (
+          <CircleDotIcon aria-hidden="true" className="size-4 shrink-0 text-secondary-label" />
+        )
       ) : null}
       {props.item.type === "environment" ? (
         <EnvironmentMachineIcon

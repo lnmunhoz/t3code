@@ -36,6 +36,7 @@ import { forkParked } from "../serverActivation.ts";
 import * as TerminalManager from "../terminal/Manager.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as ProjectStore from "./ProjectStore.ts";
+import * as ResourceCleanupService from "./ResourceCleanupService.ts";
 import { sourceControlDefinitions } from "../sourceControl/sourceControlDefinitions.ts";
 import {
   legacyThreadPullRequestKey,
@@ -358,6 +359,7 @@ export const make = Effect.gen(function* () {
     quietOpenReadAt.clear();
   });
   const terminals = yield* TerminalManager.TerminalManager;
+  const resourceCleanup = yield* ResourceCleanupService.ResourceCleanupService;
   const projectScripts = yield* ProjectSetupScriptRunner.ProjectSetupScriptRunner;
   // Repeated thread.settled retains settledAt; run the action only once per settlement.
   const settleActionRunAt = new Map<ThreadId, number>();
@@ -759,6 +761,14 @@ export const make = Effect.gen(function* () {
       const settled = yield* projections.getThread(threadId);
       if (settled.deletedAt !== null || settled.settledOverride !== "settled") return;
       yield* terminals.closeOnSettle({ threadId });
+      yield* resourceCleanup.cleanupPreviews(threadId, { keepPinned: true }).pipe(
+        Effect.catch((cause) =>
+          Effect.logWarning("closing a settled thread's browser tabs failed", {
+            threadId,
+            cause,
+          }),
+        ),
+      );
       const worktreePath = settled.worktreePath;
       if (worktreePath === null) return;
       if (!(yield* fileSystem.exists(worktreePath))) {

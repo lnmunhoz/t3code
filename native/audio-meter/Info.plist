@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>T3 Code Music Meter</string>
+	<key>CFBundleExecutable</key>
+	<string>t3-audio-meter</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.t3tools.audio-meter</string>
+	<key>CFBundleName</key>
+	<string>T3 Code Music Meter</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.2</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>T3 Code shows live music bars from Spotify and Apple Music. No audio is kept.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>T3 Code shows live music bars from Spotify and Apple Music. Only those two apps are measured and no audio is kept.</string>
+</dict>
+</plist>

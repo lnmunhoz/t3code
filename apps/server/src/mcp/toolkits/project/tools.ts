@@ -194,7 +194,7 @@ const ThreadLaunchTool = Tool.make("t3_thread_launch", {
 const ThreadMoveTool = Tool.make("t3_thread_move", {
   ...shared,
   description:
-    "Move a No project thread into an existing project, keeping its conversation. Omit `threadId` for this thread. This thread moves when your turn ends, so call it last and end your turn; `continuationPrompt` then starts the next turn in the project folder. Files in the old folder stay there.",
+    "Move a No project thread into an existing project, keeping its conversation. A thread in a project can also move into a project whose folder is inside its project's folder (from ~/home into ~/home/ThaiLookup), unless it runs in a worktree. Omit `threadId` for this thread. This thread moves when your turn ends, so call it last and end your turn; `continuationPrompt` then starts the next turn in the project folder. Files in the old folder stay there.",
   parameters: Schema.Struct({
     environmentId: OrchestratorMcpEnvironmentTarget,
     threadId: Schema.optional(ThreadId),

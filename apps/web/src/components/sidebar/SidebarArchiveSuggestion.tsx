@@ -7,6 +7,7 @@ import {
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import { AuthOrchestrationOperateScope, type ScopedThreadRef } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
+import { Plural, T, useGT, Var } from "gt-react";
 import { ArchiveIcon, CheckIcon, ChevronDownIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 
@@ -62,6 +63,7 @@ export function SidebarArchiveSuggestion(props: {
   projectByKey: ReadonlyMap<string, EnvironmentProject>;
   onOpen: (threadRef: ScopedThreadRef) => void;
 }) {
+  const gt = useGT();
   const idleHours = useClientSettings((settings) => settings.sidebarArchiveSuggestionHours);
   // A minute clock, so threads cross the threshold without other sidebar activity.
   // Its snapshot is a UTC "YYYY-MM-DDTHH:MM" with no zone suffix.
@@ -152,8 +154,11 @@ export function SidebarArchiveSuggestion(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: `Failed to archive ${failedKeys.size} thread${failedKeys.size === 1 ? "" : "s"}`,
-          description: firstError instanceof Error ? firstError.message : "An error occurred.",
+          title: gt(
+            "{count, plural, one {Failed to archive {count} thread} other {Failed to archive {count} threads}}",
+            { count: failedKeys.size },
+          ),
+          description: firstError instanceof Error ? firstError.message : gt("An error occurred."),
         }),
       );
     }
@@ -166,20 +171,25 @@ export function SidebarArchiveSuggestion(props: {
     <li className="list-none py-0.5" data-testid="sidebar-archive-suggestion">
       <div
         role="group"
-        aria-label={`Archive suggestion: ${count} thread${count === 1 ? "" : "s"} idle for ${idleLabel}`}
+        aria-label={gt(
+          "{count, plural, one {Archive suggestion: {count} thread idle for {idleLabel}} other {Archive suggestion: {count} threads idle for {idleLabel}}}",
+          { count, idleLabel },
+        )}
         className="group/archive-suggestion rounded-md bg-muted/40 px-(--sidebar-row-content-inset) py-(--sidebar-content-inset) text-sidebar-foreground"
       >
         <div className="flex h-5 min-w-0 items-center gap-1.5">
           <ArchiveIcon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
           <span className="min-w-0 flex-1 truncate text-xs font-medium text-secondary-label">
-            Idle for {idleLabel}+
+            <T>
+              Idle for <Var>{idleLabel}</Var>+
+            </T>
           </span>
           <Tooltip>
             <TooltipTrigger
               render={
                 <button
                   type="button"
-                  aria-label="Keep these threads"
+                  aria-label={gt("Keep these threads")}
                   onClick={() => keep(candidates.map((candidate) => candidate.key))}
                   className={`${hoverRevealClassName} group-hover/archive-suggestion:pointer-events-auto group-hover/archive-suggestion:opacity-100`}
                 >
@@ -187,15 +197,33 @@ export function SidebarArchiveSuggestion(props: {
                 </button>
               }
             />
-            <TooltipPopup side="top">Keep these threads</TooltipPopup>
+            <TooltipPopup side="top">
+              <T>Keep these threads</T>
+            </TooltipPopup>
           </Tooltip>
         </div>
         <div className="mt-0.5 truncate text-sm font-medium text-foreground/90">
-          Archive {count} idle thread{count === 1 ? "" : "s"}?
+          <T>
+            <Plural
+              n={count}
+              one={
+                <>
+                  Archive <Var>{count}</Var> idle thread?
+                </>
+              }
+              other={
+                <>
+                  Archive <Var>{count}</Var> idle threads?
+                </>
+              }
+            />
+          </T>
         </div>
         <div className="mt-1.5 flex items-center gap-1.5">
           <Button size="xs" variant="secondary" onClick={() => void archive(candidates)}>
-            {count === 1 ? "Archive" : "Archive all"}
+            {count === 1
+              ? gt("Archive", { $context: "verb, archive one thread" })
+              : gt("Archive all")}
           </Button>
           <Button
             size="xs"
@@ -203,7 +231,7 @@ export function SidebarArchiveSuggestion(props: {
             aria-expanded={expanded}
             onClick={() => setExpanded((value) => !value)}
           >
-            Review
+            <T>Review</T>
             <ChevronDownIcon aria-hidden className={expanded ? "size-3 rotate-180" : "size-3"} />
           </Button>
         </div>
@@ -234,7 +262,7 @@ export function SidebarArchiveSuggestion(props: {
                       render={
                         <button
                           type="button"
-                          aria-label={`Keep ${thread.title}`}
+                          aria-label={gt("Keep {title}", { title: thread.title })}
                           onClick={() => keep([candidate.key])}
                           className={`${hoverRevealClassName} h-7 group-hover/archive-candidate:pointer-events-auto group-hover/archive-candidate:opacity-100`}
                         >
@@ -242,7 +270,9 @@ export function SidebarArchiveSuggestion(props: {
                         </button>
                       }
                     />
-                    <TooltipPopup side="top">Keep</TooltipPopup>
+                    <TooltipPopup side="top">
+                      <T>Keep</T>
+                    </TooltipPopup>
                   </Tooltip>
                 </li>
               );

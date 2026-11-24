@@ -14,10 +14,11 @@ import {
   type RunStopPresentation,
 } from "@t3tools/client-runtime/state/thread-execution";
 import { childThreadInputsTitle } from "@t3tools/client-runtime/state/threads";
+import type { SideThreadOpenIntent } from "@t3tools/client-runtime/side-thread";
 import { commandDisplayText } from "@t3tools/client-runtime/work-log/command-label";
 import { formatDuration } from "@t3tools/shared/orchestrationTimingCopy";
 import * as DateTime from "effect/DateTime";
-import { msg, T, Var } from "gt-react";
+import { msg, T, useGT, Var } from "gt-react";
 import {
   CircleDashedIcon,
   CircleStopIcon,
@@ -31,6 +32,7 @@ import {
 import { Fragment } from "react";
 import { m, type MessageResolver } from "~/i18n/messages";
 import { tickTextContent } from "~/lib/tickTextContent";
+import { BackgroundSubagentRows, type BackgroundSubagentRow } from "./BackgroundSubagentRows";
 import { BackgroundWorkDetails } from "./BackgroundWorkDetails";
 import { Button, InlineButton } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -212,11 +214,12 @@ function BackgroundProgressBar({
 }: {
   readonly progress: OrchestrationV2BackgroundTaskProgress & { readonly total: number };
 }) {
+  const gt = useGT();
   const done = Math.min(progress.done ?? 0, progress.total);
   return (
     <span
       role="progressbar"
-      aria-label={progress.label ?? "Progress"}
+      aria-label={progress.label ?? gt("Progress")}
       aria-valuemin={0}
       aria-valuemax={progress.total}
       aria-valuenow={done}
@@ -279,20 +282,31 @@ export function backgroundWorkNowItem(
       updatedAtMs: subagent ? DateTime.toEpochMillis(subagent.updatedAt) : 0,
     };
   });
-  const [only] = rows.length === 1 ? rows : [];
-  const newest = rows
+  const isCommand = (row: (typeof rows)[number]) => row.task.kind !== "subagent";
+  // Subagents get a row each under the line, so the line describes only the other work.
+  const subagentRows = rows.flatMap((row) => (row.subagentRow ? [row.subagentRow] : []));
+  const lineRows = subagentRows.length > 0 ? rows.filter(isCommand) : rows;
+  const [only] = lineRows.length === 1 ? lineRows : [];
+  const newest = lineRows
     .filter((row) => row.activity)
     .toSorted((left, right) => right.updatedAtMs - left.updatedAtMs)[0];
-  const isCommand = (row: (typeof rows)[number]) => row.task.kind !== "subagent";
-  const startedAtMs = only?.startedAtMs ?? null;
-  const counted = (only ? [only] : rows)
+  const startedAtMs = rows.length === 1 ? (only?.startedAtMs ?? null) : null;
+  const counted = (only ? [only] : lineRows)
     .map((row) => row.progress)
     .find((progress) => progress?.total !== undefined);
   return {
     id: `background-work:${input.threadId}`,
     icon: rows.every(isCommand) ? <TerminalIcon /> : <CircleDashedIcon />,
     title:
-      only && typeof only.label !== "string" && only.task.label !== only.task.kind ? (
+      subagentRows.length > 0 && rows.length === 1 ? (
+        presentation.waiting ? (
+          resolve(msg("Waiting on a subagent"))
+        ) : (
+          resolve(msg("Running a subagent"))
+        )
+      ) : subagentRows.length > 0 ? (
+        presentation.title
+      ) : only && typeof only.label !== "string" && only.task.label !== only.task.kind ? (
         <>
           {presentation.waiting ? (
             <T>
@@ -318,14 +332,22 @@ export function backgroundWorkNowItem(
       <>
         {newest.label}: {newest.activity}
       </>
-    ) : (
-      rows.map((row, index) => (
+    ) : lineRows.length > 0 ? (
+      lineRows.map((row, index) => (
         <Fragment key={row.task.taskId}>
           {index > 0 ? ", " : null}
           {row.label}
         </Fragment>
       ))
-    ),
+    ) : undefined,
+    body:
+      subagentRows.length > 0 ? (
+        <BackgroundSubagentRows
+          environmentId={input.environmentId}
+          rows={subagentRows}
+          onOpenThread={onOpenThread}
+        />
+      ) : undefined,
     actions: (
       <>
         {counted?.total === undefined ? null : (
@@ -340,13 +362,16 @@ export function backgroundWorkNowItem(
             className="tabular-nums"
           />
         )}
-        <BackgroundWorkDetails
-          environmentId={input.environmentId}
-          threadId={input.threadId}
-          tasks={input.tasks}
-          turnItems={input.turnItems}
-          onOpenThread={onOpenThread}
-        />
+        {/* For subagents alone the rows already show everything the dialog would. */}
+        {lineRows.length > 0 ? (
+          <BackgroundWorkDetails
+            environmentId={input.environmentId}
+            threadId={input.threadId}
+            tasks={input.tasks}
+            turnItems={input.turnItems}
+            onOpenThread={onOpenThread}
+          />
+        ) : null}
         <InlineButton disabled={input.stopDisabled} onClick={() => void input.onStop()}>
           {input.stopping ? <T>Stopping...</T> : <T context="verb, stops background work">Stop</T>}
         </InlineButton>

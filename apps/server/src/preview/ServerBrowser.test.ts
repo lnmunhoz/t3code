@@ -3935,6 +3935,30 @@ it.effect("failed session and browser launches release capacity, as does closing
   ).pipe(Effect.provide(layer)),
 );
 
+it.effect("tabs a person opens leave the server's agent budget free", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const browser = yield* ServerBrowser.ServerBrowser;
+      const broker = yield* Broker.PreviewAutomationBroker;
+      const manager = yield* Manager.PreviewManager;
+      yield* Effect.yieldNow;
+      for (let index = 0; index < 32; index++) {
+        const { tabId } = yield* manager.open({
+          threadId: scope.thread.threadId,
+          runtime: "server",
+        });
+        yield* browser.attachViewer(viewerInput(tabId, false));
+      }
+      const opened = yield* broker.invoke<PreviewAutomationStatus>({
+        scope,
+        operation: "open",
+        input: { reuseExistingTab: false, show: false },
+      });
+      expect(opened.available).toBe(true);
+    }),
+  ).pipe(Effect.provide(layer)),
+);
+
 it.effect("a full server takes back the slot of the longest idle agent tab nobody views", () =>
   Effect.scoped(
     Effect.gen(function* () {

@@ -149,6 +149,10 @@ it.layer(layer)("PreviewManager", (it) => {
       expect(events[1]!.revision).toBeGreaterThan(events[0]!.revision);
       expect(listed.revision).toBe(events[1]!.revision);
       expect(listed.sessions).toHaveLength(1);
+
+      const other = yield* manager.open({ threadId: freshThreadId() });
+      const everyThread = (yield* manager.list({})).sessions.map((session) => session.tabId);
+      expect(everyThread).toEqual(expect.arrayContaining([opened.tabId, other.tabId]));
     }),
   );
 
@@ -238,6 +242,22 @@ it.layer(layer)("PreviewManager", (it) => {
       expect(events[1]!.revision).toBeGreaterThan(events[0]!.revision);
       expect(listed.revision).toBe(events[1]!.revision);
       expect(listed.sessions).toHaveLength(0);
+    }),
+  );
+
+  it.effect("a thread-wide close that keeps pinned tabs leaves them open", () =>
+    Effect.gen(function* () {
+      const threadId = freshThreadId();
+      const manager = yield* PreviewManager.PreviewManager;
+      const pinned = yield* manager.open({ threadId, url: "http://localhost:5173" });
+      yield* manager.open({ threadId, url: "http://localhost:3000" });
+      const adjusted = yield* manager.adjust({ threadId, tabId: pinned.tabId, pinned: true });
+      expect(adjusted.pinned).toBe(true);
+
+      yield* manager.close({ threadId, keepPinned: true });
+
+      const { sessions } = yield* manager.list({ threadId });
+      expect(sessions.map((session) => session.tabId)).toEqual([pinned.tabId]);
     }),
   );
 

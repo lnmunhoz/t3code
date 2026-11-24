@@ -12527,7 +12527,29 @@ it.layer(layerScratchPromotionTest)("turning a No project thread into a project"
       const moveError = yield* promotion
         .moveToProject({ threadId, projectId: elsewhere.id, fromOwnTurn: false })
         .pipe(Effect.flip);
-      assert.equal(moveError.message, "Only a No project thread can move into a project.");
+      assert.equal(
+        moveError.message,
+        "Only a No project thread, or one moving into a project inside its project's folder, can move.",
+      );
+
+      // Local customization: into a project inside the thread's project folder is allowed.
+      const inside = yield* projects.create({
+        commandId: CommandId.make("promotion-regular-inside"),
+        projectId: ProjectId.make("promotion-regular-inside"),
+        title: "Inside",
+        workspaceRoot: "/tmp/runtime-layer-promotion-regular/inside",
+      });
+      const moved = yield* promotion.moveToProject({
+        threadId,
+        projectId: inside.id,
+        fromOwnTurn: false,
+      });
+      assert.deepEqual(moved, {
+        projectId: inside.id,
+        workspaceRoot: "/tmp/runtime-layer-promotion-regular/inside",
+        movesWhenTurnEnds: false,
+      });
+      assert.equal((yield* shellOf(threadId))?.projectId, inside.id);
     }),
   );
 

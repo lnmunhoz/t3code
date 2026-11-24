@@ -2,6 +2,7 @@ import { m } from "../i18n/messages";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { useGT, useMessages } from "gt-react";
 import { ChildThreadApprovals } from "./chat/ChildThreadApprovals";
+import { ComposerThreadLabel } from "./chat/ComposerThreadLabel";
 import { workspaceAreaProps } from "../lib/workspaceFocus";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { resolveNewThreadModelSelection } from "@t3tools/shared/usageLimits";
@@ -193,6 +194,7 @@ import {
 } from "./preview/ThreadPreviewMiniPlayer";
 import { createChatCanvasStore, resolveChatCanvasModel } from "./chat/canvasStore";
 import { usePreviewSession } from "./preview/usePreviewSession";
+import { useProjectPinnedTabs } from "./preview/pinnedTabs";
 import { getConfiguredPreviewUrls } from "./preview/previewEmptyStateLogic";
 
 import {
@@ -1127,8 +1129,36 @@ export default function ChatView(props: ChatViewProps) {
   );
   const activePreviewState = useThreadPreviewState(activeThreadRef);
   const activePreviewServerEpoch = activePreviewState.serverEpoch;
+  const projectPinnedTabs = useProjectPinnedTabs(activeThreadRef);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- mirrors the server's pinned tabs into this thread's panel tabs
+  useEffect(() => {
+    if (!activeThreadRef) return;
+    useRightPanelStore.getState().reconcilePinnedSurfaces(
+      activeThreadRef,
+      projectPinnedTabs.tabs.map(({ ownerThreadId, tabId }) => ({ ownerThreadId, tabId })),
+    );
+  }, [activeThreadRef, projectPinnedTabs.tabs]);
+  const pinnedOwnerByTabId = new Map(
+    projectPinnedTabs.tabs.map((pin) => [pin.tabId, pin.ownerThreadId]),
+  );
+  const panelPreviewSessions =
+    projectPinnedTabs.tabs.length === 0
+      ? activePreviewState.sessions
+      : {
+          ...activePreviewState.sessions,
+          ...Object.fromEntries(projectPinnedTabs.tabs.map((pin) => [pin.tabId, pin.snapshot])),
+        };
   const resolvePreviewRuntimeTabId = activeThreadRef
-    ? (tabId: string) => previewRuntimeTabId(activeThreadRef, activePreviewServerEpoch, tabId)
+    ? (tabId: string) => {
+        const owner = pinnedOwnerByTabId.get(tabId);
+        return owner
+          ? previewRuntimeTabId(
+              scopeThreadRef(activeThreadRef.environmentId, owner),
+              projectPinnedTabs.serverEpoch,
+              tabId,
+            )
+          : previewRuntimeTabId(activeThreadRef, activePreviewServerEpoch, tabId);
+      }
     : undefined;
   const activePreviewMiniPlayer = usePreviewMiniPlayerStore((state) =>
     selectThreadPreviewMiniPlayer(state.byThreadKey, activeThreadRef),
@@ -3738,6 +3768,14 @@ export default function ChatView(props: ChatViewProps) {
                     }
                   >
                     <ChildThreadApprovals threadRef={activeThreadRef} />
+                    {!isDraftHeroState && activeProject ? (
+                      <ComposerThreadLabel
+                        project={activeProject}
+                        environmentId={activeThread.environmentId}
+                        threadId={activeThread.id}
+                        threadTitle={activeThread.title}
+                      />
+                    ) : null}
                     <div className="relative">
                       <ComposerSurface.Shell contextRow={showComposerContextStrip}>
                         <ComposerSurface.Host
@@ -4162,7 +4200,7 @@ export default function ChatView(props: ChatViewProps) {
           environmentId={activeThreadRef.environmentId}
           activeSurfaceId={renderedRightPanelSurface?.id ?? null}
           pendingSurfaceIds={pendingFileSurfaceIds}
-          previewSessions={activePreviewState.sessions}
+          previewSessions={panelPreviewSessions}
           desktopByTabId={activePreviewState.desktopByTabId}
           previewRuntimeTabId={resolvePreviewRuntimeTabId}
           terminalLabelsById={activeTerminalLabelsById}

@@ -240,7 +240,7 @@ export function startThreadNotifications(
     if (project === null || !getClientSettings().inAppNotificationsEnabled) return;
     toastManager.add({
       type: "success",
-      title: `Moved to ${project.title}`,
+      title: m(msg("Moved to {project}", { project: project.title })),
       description: thread.title,
     });
   };

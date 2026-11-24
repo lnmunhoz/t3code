@@ -26,6 +26,9 @@ import { startMainAppLocationTracking } from "./components/sidebar/mainAppLocati
 import { startDesktopUpdateLaunchNotice } from "./components/sidebar/updateEverythingRun";
 import { startSlowRpcRequestToasts } from "./components/SlowRpcRequestToastCoordinator";
 import { startThreadNotifications } from "./components/ThreadNotificationCoordinator";
+import { startTaskWatcher } from "./components/tasks/taskWatcher";
+import { isTasksPopout, startTasksPopoutThreadOpening } from "./components/tasks/tasksPopout";
+import { startWaitingAlerts } from "./components/tasks/taskLive";
 import { startGuideRunNotifications } from "./components/pullRequest/guide/PullRequestGuideRunCoordinator";
 import { APP_BASE_NAME, APP_DISPLAY_NAME, APP_STAGE_LABEL } from "./branding";
 import { resolveServerBackedAppDisplayName, resolveWindowTitle } from "./branding.logic";
@@ -268,6 +271,19 @@ export function startAppServices(): AppRouter {
 
   installDesktopPasteAsText(window.desktopBridge, window);
 
+  // Fork: the Tasks window shows only the Tasks page. The app-wide services (the watcher,
+  // notifications, announcements, migrations, location tracking) run once, in the main window.
+  if (isTasksPopout) {
+    startClientAppearance();
+    startI18n();
+    startHostEnvironmentLookup();
+    startEnvironmentThemeRepaint();
+    startThemeBackground();
+    startBrowserChromeThemeSync(router);
+    document.title = "Tasks";
+    return router;
+  }
+
   startClientAppearance();
   startI18n();
   startDocumentTitle(router);
@@ -310,6 +326,9 @@ export function startAppServices(): AppRouter {
   startLegacyThreadMigrationToast();
   startPermissionUpdateNotices(router);
   startThreadNotifications(appAtomRegistry, router);
+  if (isElectron) startTaskWatcher(appAtomRegistry);
+  if (isElectron) startTasksPopoutThreadOpening(router);
+  if (isElectron) startWaitingAlerts(appAtomRegistry);
   startGuideRunNotifications(appAtomRegistry, router);
   if (isElectron) startDesktopUpdateLaunchNotice();
 

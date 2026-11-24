@@ -1121,6 +1121,15 @@ export interface DesktopBridge {
   /** Dev desktop only: restart the app onto that newer server build. */
   restartForDevServerBuild?: () => Promise<void>;
   /**
+   * macOS desktop: Spotify and Apple Music's live 40-band spectrum (0 to 1, bass first) while
+   * subscribed; null when the meter stops. The native meter runs only while someone listens.
+   */
+  subscribeMusicLevels?: (listener: (spectrum: ReadonlyArray<number> | null) => void) => () => void;
+  /** macOS desktop: show the music meter's Microphone prompt (or System Settings if refused). */
+  requestMusicMeterAccess?: () => Promise<"granted" | "denied" | "unavailable">;
+  /** Desktop: the Tasks page's board file (`~/.config/t3code-tasks/tasks.json`) and its watcher. */
+  taskBoard?: DesktopTaskBoardBridge;
+  /**
    * Renderer `window.focus()` cannot raise an Electron window, and on Wayland
    * only the main process can spend a notification click's activation token.
    */
@@ -1452,4 +1461,87 @@ export interface LocalApi {
     getClientSettings: () => Promise<ClientSettings | null>;
     setClientSettings: (settings: ClientSettings) => Promise<void>;
   };
+}
+
+/** One rate-limit window of a Claude account. */
+export interface DesktopProxyLimitWindow {
+  /** 0–100. */
+  readonly pct: number;
+  readonly resetsAt: string | null;
+  readonly status: string | null;
+}
+
+/** A Claude account connected to the local proxy (EasyCLIProxyAPI), with its last-seen limits. */
+export interface DesktopProxyLimitsAccount {
+  readonly id: string;
+  readonly label: string;
+  readonly status: string;
+  readonly disabled: boolean;
+  readonly unavailable: boolean;
+  readonly cooldownUntil: string | null;
+  /** When the proxy last saw this account's limit headers. */
+  readonly observedAt: string | null;
+  readonly fiveHour: DesktopProxyLimitWindow | null;
+  readonly sevenDay: DesktopProxyLimitWindow | null;
+  readonly overage: string | null;
+  readonly bindingClaim: string | null;
+}
+
+export interface DesktopProxyLimits {
+  readonly fetchedAt: string;
+  readonly error: "no_key" | "proxy_down" | "unauthorized" | "bad_reply" | null;
+  readonly accounts: ReadonlyArray<DesktopProxyLimitsAccount>;
+}
+
+/** Desktop: the Tasks page's board file and the watcher's cheap model call. */
+export interface DesktopTaskBoardBridge {
+  /** The board file's text, or null when it doesn't exist yet. */
+  read: () => Promise<string | null>;
+  /** Replaces the board file atomically. */
+  write: (text: string) => Promise<boolean>;
+  /** Calls back with the file's new text when something else (an agent) changes it. */
+  subscribe: (listener: (text: string) => void) => () => void;
+  /** The board file's path, to show and to give agents. */
+  filePath: () => Promise<string>;
+  /** One headless Claude call with no tools: the reply (null when it failed) and what it cost. */
+  classify: (request: {
+    readonly system: string;
+    readonly prompt: string;
+    readonly model: string;
+  }) => Promise<DesktopTaskClassifyResult>;
+  /** The watcher's call log (one JSON record per line), or null when there is none yet. */
+  readUsage: () => Promise<string | null>;
+  /** Adds one record (a JSON line) to the call log. */
+  appendUsage: (line: string) => Promise<boolean>;
+  /** The watcher's question-and-answer log (one JSON record per line), or null when there is none yet. */
+  readQuestions: () => Promise<string | null>;
+  /** Adds records (JSON lines, newline-joined) to the question-and-answer log. */
+  appendQuestions: (lines: string) => Promise<boolean>;
+  /** Opens the Tasks page in its own window, or focuses it when it is already open. */
+  openPopout: () => Promise<boolean>;
+  /** Keeps the Tasks window above other apps, or not; null only reads. Resolves to the setting. */
+  pinPopout: (pinned: boolean | null) => Promise<boolean>;
+  /** A task just turned to waiting on you: the Dock icon bounces once unless the app is in front. */
+  alertWaiting: () => Promise<boolean>;
+  /** Each Claude account's 5-hour and weekly limits, as the local proxy last saw them. */
+  readProxyLimits: () => Promise<DesktopProxyLimits>;
+  /** From the Tasks window: brings the main window forward on this chat. */
+  showThread: (thread: { environmentId: string; threadId: string }) => Promise<boolean>;
+  /** In the main window: a chat the Tasks window asked to show. */
+  onOpenThread: (
+    listener: (thread: { environmentId: string; threadId: string }) => void,
+  ) => () => void;
+}
+
+/** One watcher call as the Claude CLI reported it. Token counts and cost are 0 when it failed early. */
+export interface DesktopTaskClassifyResult {
+  readonly text: string | null;
+  readonly model: string;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly cacheReadTokens: number;
+  readonly cacheWriteTokens: number;
+  readonly costUsd: number;
+  readonly durationMs: number;
+  readonly error: string | null;
 }

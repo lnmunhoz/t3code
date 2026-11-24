@@ -53,6 +53,8 @@ interface Props {
   profileName: string | undefined;
   findShortcutLabel?: string | null;
   move?: { readonly label: string; readonly onMove: () => void };
+  /** Fork: pins the tab to its project, so every chat of the project shows it. */
+  pin?: { readonly pinned: boolean; readonly onToggle: () => void };
 }
 
 const MenuTriggerButton = () => {
@@ -93,6 +95,7 @@ export function PreviewMoreMenu({
   profileName,
   findShortcutLabel,
   move,
+  pin,
 }: Props) {
   const gt = useGT();
   const m = useMessages();
@@ -124,6 +127,11 @@ export function PreviewMoreMenu({
           </MenuItem>
         ) : null}
         {move ? <MenuItem onClick={move.onMove}>{move.label}</MenuItem> : null}
+        {pin ? (
+          <MenuItem onClick={pin.onToggle}>
+            {pin.pinned ? gt("Unpin from project") : gt("Pin to project")}
+          </MenuItem>
+        ) : null}
         <MenuItem onClick={onToggleDeviceToolbar} disabled={disabled}>
           {deviceToolbarVisible ? gt("Hide device toolbar") : gt("Show device toolbar")}
         </MenuItem>

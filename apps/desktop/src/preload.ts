@@ -142,6 +142,60 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     return () => ipcRenderer.removeListener(IpcChannels.DEV_SERVER_BUILD_READY_CHANNEL, handler);
   },
   restartForDevServerBuild: () => ipcRenderer.invoke(IpcChannels.DEV_SERVER_BUILD_RESTART_CHANNEL),
+  subscribeMusicLevels: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, spectrum: unknown) =>
+      listener(Array.isArray(spectrum) ? spectrum : null);
+    ipcRenderer.on(IpcChannels.MUSIC_LEVELS_CHANNEL, handler);
+    void ipcRenderer.invoke(IpcChannels.MUSIC_LEVELS_SUBSCRIBE_CHANNEL, true);
+    return () => {
+      ipcRenderer.removeListener(IpcChannels.MUSIC_LEVELS_CHANNEL, handler);
+      void ipcRenderer.invoke(IpcChannels.MUSIC_LEVELS_SUBSCRIBE_CHANNEL, false);
+    };
+  },
+  requestMusicMeterAccess: () => ipcRenderer.invoke(IpcChannels.MUSIC_METER_REQUEST_ACCESS_CHANNEL),
+  taskBoard: {
+    read: () => ipcRenderer.invoke(IpcChannels.TASK_BOARD_READ_CHANNEL),
+    write: (text) => ipcRenderer.invoke(IpcChannels.TASK_BOARD_WRITE_CHANNEL, text),
+    subscribe: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, text: unknown) => {
+        if (typeof text === "string") listener(text);
+      };
+      ipcRenderer.on(IpcChannels.TASK_BOARD_CHANGED_CHANNEL, handler);
+      void ipcRenderer.invoke(IpcChannels.TASK_BOARD_SUBSCRIBE_CHANNEL, true);
+      return () => {
+        ipcRenderer.removeListener(IpcChannels.TASK_BOARD_CHANGED_CHANNEL, handler);
+        void ipcRenderer.invoke(IpcChannels.TASK_BOARD_SUBSCRIBE_CHANNEL, false);
+      };
+    },
+    filePath: () => ipcRenderer.invoke(IpcChannels.TASK_BOARD_PATH_CHANNEL),
+    classify: (request) => ipcRenderer.invoke(IpcChannels.TASK_BOARD_CLASSIFY_CHANNEL, request),
+    readUsage: () => ipcRenderer.invoke(IpcChannels.TASK_BOARD_USAGE_READ_CHANNEL),
+    appendUsage: (line) => ipcRenderer.invoke(IpcChannels.TASK_BOARD_USAGE_APPEND_CHANNEL, line),
+    readQuestions: () => ipcRenderer.invoke(IpcChannels.TASK_BOARD_QUESTIONS_READ_CHANNEL),
+    appendQuestions: (lines) =>
+      ipcRenderer.invoke(IpcChannels.TASK_BOARD_QUESTIONS_APPEND_CHANNEL, lines),
+    openPopout: () => ipcRenderer.invoke(IpcChannels.TASK_BOARD_OPEN_POPOUT_CHANNEL),
+    pinPopout: (pinned) => ipcRenderer.invoke(IpcChannels.TASK_BOARD_POPOUT_PIN_CHANNEL, pinned),
+    alertWaiting: () => ipcRenderer.invoke(IpcChannels.TASK_BOARD_ALERT_WAITING_CHANNEL),
+    readProxyLimits: () => ipcRenderer.invoke(IpcChannels.PROXY_LIMITS_READ_CHANNEL),
+    showThread: (thread) => ipcRenderer.invoke(IpcChannels.TASK_BOARD_SHOW_THREAD_CHANNEL, thread),
+    onOpenThread: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, thread: unknown) => {
+        if (
+          typeof thread === "object" &&
+          thread !== null &&
+          typeof (thread as { environmentId?: unknown }).environmentId === "string" &&
+          typeof (thread as { threadId?: unknown }).threadId === "string"
+        ) {
+          listener(thread as { environmentId: string; threadId: string });
+        }
+      };
+      ipcRenderer.on(IpcChannels.TASK_BOARD_OPEN_THREAD_CHANNEL, handler);
+      return () => {
+        ipcRenderer.removeListener(IpcChannels.TASK_BOARD_OPEN_THREAD_CHANNEL, handler);
+      };
+    },
+  },
   revealWindow: () => ipcRenderer.invoke(IpcChannels.REVEAL_WINDOW_CHANNEL),
   getPrimaryPasteEnabled: () => primaryPasteEnabled,
   getSystemLocale: () => {

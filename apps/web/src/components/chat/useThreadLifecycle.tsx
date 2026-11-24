@@ -651,7 +651,8 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
           stopDisabled: runIsLive || !canOperateThread || isStoppingBackgroundWork,
           stopping: isStoppingBackgroundWork,
           onStop: handleStopBackgroundWorkStable,
-          onOpenThread: onOpenRelatedThreadStable,
+          onOpenThread: (threadId, intent) =>
+            void onOpenRelatedThreadStable(threadId, environmentId, intent),
         },
         messages,
       )

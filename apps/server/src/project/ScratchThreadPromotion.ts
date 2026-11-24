@@ -43,10 +43,9 @@ export class ScratchThreadPromotion extends Context.Service<
       readonly threadId: ThreadId;
     }) => Effect.Effect<{ readonly projectId: ProjectId }, ScratchThreadPromotionError>;
     /**
-     * Moves one No project thread into an existing project's root folder. Its live session
-     * ends and the next turn resumes the conversation there; the old folder stays on disk.
-     * `fromOwnTurn` lets a thread move itself: the move then happens when its turn ends.
-     * `continuation` is queued as the thread's next message once it has moved.
+     * Moves a No project thread (or one whose project folder holds the target's) into a project's
+     * root. Its session ends; the next turn resumes there. `fromOwnTurn`: a thread moving itself
+     * moves when its turn ends. `continuation` is queued as its next message after the move.
      */
     readonly moveToProject: (input: {
       readonly threadId: ThreadId;
@@ -189,9 +188,13 @@ const make = Effect.gen(function* () {
       yield* moveTasks;
       return { ...moved, movesWhenTurnEnds: false };
     }
-    if (!(yield* managedFolders.isScratchProject(thread.projectId))) {
+    if (
+      !(yield* managedFolders.isScratchProject(thread.projectId)) &&
+      !(yield* movesIntoSubfolder(thread, target.workspaceRoot))
+    ) {
       return yield* new ScratchThreadPromotionError({
-        reason: "Only a No project thread can move into a project.",
+        reason:
+          "Only a No project thread, or one moving into a project inside its project's folder, can move.",
       });
     }
     const records = yield* threads
@@ -255,6 +258,25 @@ const make = Effect.gen(function* () {
         Effect.forkIn(layerScope),
       );
     return { ...moved, movesWhenTurnEnds: true };
+  });
+
+  // Local customization: a chat started in a broad project (such as ~/home) can move into the
+  // project for the folder it ended up working in (such as ~/home/ThaiLookup). Only for chats
+  // on the project's own folder: a move drops the chat's worktree.
+  const movesIntoSubfolder = Effect.fn("ScratchThreadPromotion.movesIntoSubfolder")(function* (
+    thread: OrchestrationV2ThreadShell,
+    targetRoot: string,
+  ) {
+    if (thread.worktreePath !== null) return false;
+    const source = Option.getOrUndefined(
+      yield* projects.getById(thread.projectId).pipe(Effect.orElseSucceed(() => Option.none())),
+    );
+    if (source === undefined) return false;
+    const relative = path.relative(
+      yield* realPath(source.workspaceRoot),
+      yield* realPath(targetRoot),
+    );
+    return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
   });
 
   const randomId = random.uuidV4();

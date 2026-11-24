@@ -1022,6 +1022,10 @@ export function PreviewView({
         onCapture={previewBridge && tabId && !isServerTab ? handleCapture : undefined}
         captureDisabled={!desktopOverlay || isUnreachable}
         recording={recordingRuntimeTabId !== null}
+        onTogglePin={
+          snapshot ? () => void adjustServerTab({ pinned: snapshot.pinned !== true }) : undefined
+        }
+        pinned={snapshot?.pinned === true}
         onPictureInPicture={
           tabId && (isServerTab || previewBridge) ? handlePictureInPicture : undefined
         }
@@ -1057,6 +1061,14 @@ export function PreviewView({
               actions={moreMenuActions}
               {...(moveTarget
                 ? { move: { label: moveLabel, onMove: () => void handleMoveTab() } }
+                : {})}
+              {...(snapshot
+                ? {
+                    pin: {
+                      pinned: snapshot.pinned === true,
+                      onToggle: () => void adjustServerTab({ pinned: snapshot.pinned !== true }),
+                    },
+                  }
                 : {})}
               profileName={activeProfileName}
               findShortcutLabel={shortcutLabelForCommand(keybindings, "preview.find", {

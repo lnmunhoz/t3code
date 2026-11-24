@@ -1354,6 +1354,29 @@ describe("rightPanelStore", () => {
     });
   });
 
+  it("shows a project's pinned tabs beside the thread's own and drops them once unpinned", () => {
+    const store = useRightPanelStore.getState();
+    const owner = ThreadId.make("owner-thread");
+    store.openBrowser(refA, "own-tab");
+    store.reconcilePinnedSurfaces(refA, [{ ownerThreadId: owner, tabId: "pinned-tab" }]);
+    const surfaces = () =>
+      selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA).surfaces;
+    expect(surfaces()).toEqual([
+      { id: "browser:pinned-tab", kind: "preview", resourceId: "pinned-tab", ownerThreadId: owner },
+      { id: "browser:own-tab", kind: "preview", resourceId: "own-tab" },
+    ]);
+
+    // The thread's own sessions never include another thread's pinned tab.
+    store.reconcileBrowserSurfaces(refA, ["own-tab"]);
+    expect(surfaces().map((surface) => surface.id)).toEqual([
+      "browser:pinned-tab",
+      "browser:own-tab",
+    ]);
+
+    store.reconcilePinnedSurfaces(refA, []);
+    expect(surfaces().map((surface) => surface.id)).toEqual(["browser:own-tab"]);
+  });
+
   it("hides the panel when browser reconciliation removes its last session tab", () => {
     const store = useRightPanelStore.getState();
     store.openBrowser(refA, "tab-a");

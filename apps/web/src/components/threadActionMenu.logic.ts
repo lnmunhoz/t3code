@@ -252,7 +252,7 @@ export function buildThreadActionMenuItems(
       ? [
           {
             id: "move-to-project" as const,
-            label: "Move to project",
+            label: resolve(msg("Move to project")),
             icon: "folder-input",
             disabled: state.isRunning,
             children: state.moveTargets.map((project) => ({

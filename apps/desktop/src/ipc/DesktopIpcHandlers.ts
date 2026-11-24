@@ -9,6 +9,9 @@ import {
 } from "./methods/appleSpeech.ts";
 import * as DesktopIpc from "./DesktopIpc.ts";
 import { installNotificationBadge } from "./methods/notificationBadge.ts";
+import { installMusicLevels } from "./methods/musicLevels.ts";
+import { installTaskBoard } from "./methods/taskBoard.ts";
+import { installProxyLimits } from "./methods/proxyLimits.ts";
 import { installDevServerBuild } from "./methods/devServerBuild.ts";
 import { getClientSettings, setClientSettings } from "./methods/clientSettings.ts";
 import { getConnectionCatalog, setConnectionCatalog } from "./methods/connectionCatalog.ts";
@@ -98,6 +101,9 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   const ipc = yield* DesktopIpc.DesktopIpc;
   yield* installNotificationBadge();
   yield* installDevServerBuild();
+  yield* installMusicLevels();
+  yield* installTaskBoard();
+  yield* installProxyLimits();
   yield* PreviewIpc.installPreviewEventForwarding();
 
   yield* ipc.handle(AppActivationIpc.setReady);

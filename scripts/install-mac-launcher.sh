@@ -1,14 +1,16 @@
 #!/bin/bash
-# Installs "T3 Code Custom.app" into ~/Applications so Spotlight and Raycast can
-# launch this checkout's desktop app (`vp run dev:desktop`) like any other app.
+# Installs "T3 Dev.app" into ~/Applications for Spotlight and Raycast. It runs
+# this checkout's web client (`vp run dev:web`) against T3 Code Stable's server, so
+# dev shows the same projects and threads, and opens it in its own Chrome window.
+# Client changes show up live; server changes need `vp run install:stable`.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-APP_NAME="T3 Code Custom"
+APP_NAME="T3 Dev"
 APP="$HOME/Applications/$APP_NAME.app"
 ICON_PNG="$REPO/assets/dev/blueprint-macos-1024.png"
 
-rm -rf "$APP"
+rm -rf "$HOME/Applications/T3 Code Custom.app" "$HOME/Applications/T3 Code Dev.app" "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cat >"$APP/Contents/Info.plist" <<PLIST
@@ -18,7 +20,7 @@ cat >"$APP/Contents/Info.plist" <<PLIST
 <dict>
   <key>CFBundleName</key><string>$APP_NAME</string>
   <key>CFBundleDisplayName</key><string>$APP_NAME</string>
-  <key>CFBundleIdentifier</key><string>com.lnmunhoz.t3code.custom-launcher</string>
+  <key>CFBundleIdentifier</key><string>com.lnmunhoz.t3code.dev-launcher</string>
   <key>CFBundleExecutable</key><string>launcher</string>
   <key>CFBundleIconFile</key><string>icon.icns</string>
   <key>CFBundlePackageType</key><string>APPL</string>
@@ -30,29 +32,42 @@ PLIST
 
 cat >"$APP/Contents/MacOS/launcher" <<LAUNCHER
 #!/bin/zsh -l
-# Brings the running dev app forward, or starts \`vp run dev:desktop\` in $REPO.
 REPO="$REPO"
-DEV_APP_ID="com.t3tools.t3code.dev.t3code"
-RUNNER_LOCK="\$REPO/apps/desktop/.electron-runtime/dev-desktop.pid"
-LOG="\$HOME/Library/Logs/t3code-custom.log"
-mkdir -p "\$(dirname "\$LOG")"
+STABLE_ID="com.lnmunhoz.t3code.stable"
+SERVER_PORT=3773
+# A fixed offset keeps the web port, and with it the browser's sign-in, stable.
+WEB_OFFSET=40
+WEB_PORT=\$((5733 + WEB_OFFSET))
+URL="http://localhost:\$WEB_PORT"
+STATE="\$HOME/Library/Application Support/t3code-dev-web"
+LOG="\$HOME/Library/Logs/t3code-dev.log"
+mkdir -p "\$STATE" "\$(dirname "\$LOG")"
+notify() { osascript -e "display notification \"\$1\" with title \"T3 Dev\""; }
+up() { curl -s -o /dev/null -m 2 "\$1"; }
 
-if [[ "\$(osascript -e "application id \"\$DEV_APP_ID\" is running")" == "true" ]]; then
-  open -b "\$DEV_APP_ID"
-  exit 0
+# Dev uses Stable's server, so Stable has to be running.
+if ! up "http://127.0.0.1:\$SERVER_PORT/.well-known/t3/environment"; then
+  open -g -b "\$STABLE_ID"
+  for _ in {1..120}; do up "http://127.0.0.1:\$SERVER_PORT/.well-known/t3/environment" && break; sleep 0.5; done
+  up "http://127.0.0.1:\$SERVER_PORT/.well-known/t3/environment" || { notify "T3 Code Stable's server didn't start."; exit 1; }
 fi
 
-# Quitting the window leaves the dev runner idle, and it refuses a second
-# runner, so stop the idle one by the PID it recorded in its lock file.
-runner_pid="\$(cat "\$RUNNER_LOCK" 2>/dev/null)"
-if [[ -n "\$runner_pid" ]] && kill -0 "\$runner_pid" 2>/dev/null; then
-  kill -TERM "\$runner_pid"
-  for _ in {1..50}; do kill -0 "\$runner_pid" 2>/dev/null || break; sleep 0.2; done
+if ! up "\$URL/"; then
+  cd "\$REPO"
+  echo "=== \$(date) starting dev:web ===" >>"\$LOG"
+  T3CODE_PORT_OFFSET=\$WEB_OFFSET nohup "\$REPO/node_modules/.bin/vp" run dev:web --port \$SERVER_PORT >>"\$LOG" 2>&1 &
+  for _ in {1..120}; do up "\$URL/" && break; sleep 0.5; done
+  up "\$URL/" || { notify "The dev web client didn't start. See ~/Library/Logs/t3code-dev.log"; exit 1; }
 fi
 
-cd "\$REPO"
-echo "=== \$(date) starting dev:desktop ===" >>"\$LOG"
-nohup "\$REPO/node_modules/.bin/vp" run dev:desktop >>"\$LOG" 2>&1 &
+# Sign this window's browser profile in to Stable's server; sessions last 30 days.
+TARGET="\$URL/"
+if [[ ! -f "\$STATE/paired" || -n "\$(find "\$STATE/paired" -mtime +25)" ]]; then
+  token="\$(\$HOME/.t3/bin/t3 pair --label "T3 Dev" --ttl 5m 2>/dev/null | sed -n 's/^Token: //p')"
+  [[ -n "\$token" ]] && TARGET="\$URL/pair#token=\$token" && touch "\$STATE/paired"
+fi
+
+open -na "Google Chrome" --args --user-data-dir="\$STATE/chrome" --no-first-run --no-default-browser-check --app="\$TARGET"
 LAUNCHER
 chmod +x "$APP/Contents/MacOS/launcher"
 

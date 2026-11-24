@@ -8,7 +8,7 @@ import {
   matchComposerThreadItems,
 } from "@t3tools/client-runtime/composerThreadItems";
 import { useAtomValue } from "@effect/atom-react";
-import { useState } from "react";
+import { use, useState } from "react";
 import type {
   EnvironmentId,
   ProjectId,
@@ -44,6 +44,9 @@ import {
 } from "~/state/pullRequests";
 import { useEnvironmentQuery } from "~/state/query";
 import { useComposerPathSearch, useDebouncedValue, useThreadSearch } from "~/state/queries";
+import { TaskMentionsContext } from "../tasks/taskMentionsContext";
+import { useTaskBoardWhen } from "../tasks/taskBoardStore";
+import { matchTaskMentions } from "../tasks/taskMentions.logic";
 import {
   matchesPullRequestQuery,
   rankPullRequestMatches,
@@ -125,6 +128,9 @@ export function useComposerMenuItems({
   const settledPullRequestTextQuery =
     pullRequestTextQuery === debouncedPullRequestTextQuery ? pullRequestTextQuery : null;
   const isPathTrigger = composerTriggerKind === "path";
+  // Fork: in the Tasks page's planning chat, @ lists the board's tasks first.
+  const taskMentions = use(TaskMentionsContext);
+  const taskBoard = useTaskBoardWhen(taskMentions && isPathTrigger).board;
   const environmentThreadShells = useVisibleThreadShells(isPathTrigger);
   // Mounts older settled threads matching the mention, here and on linked machines, which shells
   // may leave out.
@@ -212,6 +218,17 @@ export function useComposerMenuItems({
     if (!composerTrigger) return [];
     if (composerTrigger.kind === "path") {
       return [
+        ...(taskMentions
+          ? matchTaskMentions(taskBoard, composerTrigger.query).map((task) => ({
+              id: `task:${task.id}`,
+              type: "task" as const,
+              taskId: task.id,
+              taskText: task.text,
+              waiting: task.status === "waiting",
+              label: task.text,
+              description: task.where,
+            }))
+          : []),
         ...matchComposerThreadItems(
           {
             shells: environmentThreadShells,

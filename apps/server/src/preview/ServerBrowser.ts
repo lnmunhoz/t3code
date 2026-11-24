@@ -1780,7 +1780,11 @@ const make = Effect.gen(function* () {
 
   const openingReservations = () =>
     [...pendingTabs.entries()].filter(([key]) => !tabs.has(key)).map(([, pending]) => pending);
-  const serverAtTabLimit = () => tabs.size + openingReservations().length >= SERVER_TAB_LIMIT;
+  // Tabs a person opens are never capped, so they must not spend the agents' budget either.
+  const serverAtTabLimit = () =>
+    [...tabs.values()].filter((tab) => tab.control.agentId !== null).length +
+      openingReservations().filter((pending) => pending.agentId !== null).length >=
+    SERVER_TAB_LIMIT;
   const agentAtTabLimit = (agentSessionId: string) =>
     [...tabs.values()].filter((tab) => tab.control.agentId === agentSessionId).length +
       openingReservations().filter((pending) => pending.agentId === agentSessionId).length >=

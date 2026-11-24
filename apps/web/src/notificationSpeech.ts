@@ -1,4 +1,7 @@
 import type { ClientSettings } from "@t3tools/contracts/settings";
+import { msg } from "gt-react";
+
+import { m } from "./i18n/messages";
 
 import { speakWithKokoro } from "./speech/kokoroSpeech";
 
@@ -122,7 +125,7 @@ const MAX_QUEUED = 3;
 /** Cuts long titles at a word boundary so the announcement stays short. */
 function spokenThreadTitle(title: string): string {
   const clean = title.replace(/\s+/g, " ").trim();
-  if (clean.length <= MAX_TITLE_CHARS) return clean || "Thread";
+  if (clean.length <= MAX_TITLE_CHARS) return clean || m(msg("Thread"));
   const cut = clean.slice(0, MAX_TITLE_CHARS);
   const space = cut.lastIndexOf(" ");
   return (space > MAX_TITLE_CHARS / 2 ? cut.slice(0, space) : cut).replace(/[\s,.;:-]+$/, "");
@@ -133,15 +136,15 @@ export function threadSpeechText(title: string, status: string): string {
   const subject = spokenThreadTitle(title);
   switch (status) {
     case "completion":
-      return `${subject} complete`;
+      return m(msg("{subject} complete", { subject }));
     case "approval":
-      return `${subject} needs approval`;
+      return m(msg("{subject} needs approval", { subject }));
     case "failed":
-      return `${subject} failed`;
+      return m(msg("{subject} failed", { subject }));
     case "limited":
-      return `${subject} hit a usage limit`;
+      return m(msg("{subject} hit a usage limit", { subject }));
     default:
-      return `${subject} needs your input`;
+      return m(msg("{subject} needs your input", { subject }));
   }
 }
 

@@ -3,6 +3,7 @@ import {
   MAX_SIDEBAR_ARCHIVE_SUGGESTION_HOURS,
   MIN_SIDEBAR_ARCHIVE_SUGGESTION_HOURS,
 } from "@t3tools/contracts";
+import { useGT } from "gt-react";
 import { useState } from "react";
 
 import { updateClientSettings, useClientSettings } from "../../hooks/useSettings";
@@ -16,6 +17,7 @@ const DEFAULT_HOURS = DEFAULT_CLIENT_SETTINGS.sidebarArchiveSuggestionHours ?? 1
 function IdleHoursInput({ value }: { value: number }) {
   const [draft, setDraft] = useState(String(value));
   const [draftSource, setDraftSource] = useState(value);
+  const gt = useGT();
   if (draftSource !== value) {
     setDraftSource(value);
     setDraft(String(value));
@@ -40,7 +42,7 @@ function IdleHoursInput({ value }: { value: number }) {
         }
       }}
       onBlur={() => setDraft(String(value))}
-      aria-label="Hours idle before suggesting archive"
+      aria-label={gt("Hours idle before suggesting archive")}
     />
   );
 }
@@ -49,15 +51,18 @@ function IdleHoursInput({ value }: { value: number }) {
 export function ArchiveSuggestionSettings() {
   const searchableSetting = useSearchableSetting();
   const hours = useClientSettings((settings) => settings.sidebarArchiveSuggestionHours);
+  const gt = useGT();
   return (
     <>
       <SettingsRow
         {...searchableSetting("idle-archive-suggestions")}
-        description="A card at the top of the sidebar offers to archive threads with no messages or runs for a while. It skips pinned and snoozed threads, the open thread, and work still running or waiting on you."
+        description={gt(
+          "A card at the top of the sidebar offers to archive threads with no messages or runs for a while. It skips pinned and snoozed threads, the open thread, and work still running or waiting on you.",
+        )}
         resetAction={
           hours !== DEFAULT_CLIENT_SETTINGS.sidebarArchiveSuggestionHours ? (
             <SettingResetButton
-              ariaLabel="Reset idle archive suggestions to default"
+              ariaLabel={gt("Reset idle archive suggestions to default")}
               onClick={() =>
                 void updateClientSettings({
                   sidebarArchiveSuggestionHours:
@@ -75,14 +80,17 @@ export function ArchiveSuggestionSettings() {
                 sidebarArchiveSuggestionHours: checked ? DEFAULT_HOURS : null,
               })
             }
-            aria-label="Suggest archiving idle threads"
+            aria-label={gt("Suggest archiving idle threads")}
           />
         }
       />
       {hours !== null ? (
         <SettingsRow
           title={searchableSetting("idle-archive-hours").title}
-          description={`From ${MIN_SIDEBAR_ARCHIVE_SUGGESTION_HOURS} to ${MAX_SIDEBAR_ARCHIVE_SUGGESTION_HOURS} hours (30 days).`}
+          description={gt("From {min} to {max} hours (30 days).", {
+            min: MIN_SIDEBAR_ARCHIVE_SUGGESTION_HOURS,
+            max: MAX_SIDEBAR_ARCHIVE_SUGGESTION_HOURS,
+          })}
           control={<IdleHoursInput value={hours} />}
         />
       ) : null}

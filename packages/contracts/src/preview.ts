@@ -165,6 +165,8 @@ export const PreviewSessionSnapshot = Schema.Struct({
   automationOwner: Schema.optional(Schema.String),
   reveal: Schema.optional(Schema.Boolean),
   revealRequest: Schema.optional(Schema.Struct({ id: Schema.String, force: Schema.Boolean })),
+  /** Pinned to its thread's project: every chat in the project shows this same tab. */
+  pinned: Schema.optional(Schema.Boolean),
   updatedAt: Schema.String,
 });
 export type PreviewSessionSnapshot = typeof PreviewSessionSnapshot.Type;
@@ -205,6 +207,7 @@ export const PreviewAdjustInput = Schema.Struct({
   zoomFactor: Schema.optional(PreviewZoomFactor),
   hardReload: Schema.optional(Schema.Boolean),
   clear: Schema.optional(Schema.Literals(["cookies", "cache"])),
+  pinned: Schema.optional(Schema.Boolean),
 });
 export type PreviewAdjustInput = typeof PreviewAdjustInput.Type;
 
@@ -233,7 +236,8 @@ export const PreviewClearProfileInput = Schema.Struct({
 export type PreviewClearProfileInput = typeof PreviewClearProfileInput.Type;
 
 export const PreviewListInput = Schema.Struct({
-  threadId: ThreadId,
+  /** Omitted lists the tabs of every thread. */
+  threadId: Schema.optional(ThreadId),
 });
 export type PreviewListInput = typeof PreviewListInput.Type;
 

@@ -211,6 +211,7 @@ import {
   ComposerCommandMenu,
   composerSuggestionOptionId,
 } from "./ComposerCommandMenu";
+import { taskMentionText } from "../tasks/taskMentions.logic";
 import {
   ComposerAttachButton,
   ComposerAttachmentFileList,
@@ -2093,6 +2094,20 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         });
         setComposerHighlightedItemId(null);
       }
+      return;
+    }
+    if (item.type === "task") {
+      if (trigger.kind !== "path") return;
+      const replacement = `${taskMentionText({ id: item.taskId, text: item.taskText })} `;
+      const replacementRangeEnd = extendReplacementRangeForTrailingSpace(
+        snapshot.value,
+        trigger.rangeEnd,
+        replacement,
+      );
+      const applied = applyPromptReplacement(trigger.rangeStart, replacementRangeEnd, replacement, {
+        expectedText: snapshot.value.slice(trigger.rangeStart, replacementRangeEnd),
+      });
+      if (applied) setComposerHighlightedItemId(null);
       return;
     }
     if (item.type === "thread") {

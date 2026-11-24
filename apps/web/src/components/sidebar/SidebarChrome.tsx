@@ -1,4 +1,11 @@
-import { ArrowLeftIcon, ArrowRightIcon, ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  ChartNoAxesColumnIcon,
+  GlobeIcon,
+  ListTodoIcon,
+  SettingsIcon,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { T, useGT } from "gt-react";
 import { memo } from "react";
@@ -43,6 +50,7 @@ import { SidebarProviderUpdatePill } from "./SidebarProviderUpdatePill";
 import { SidebarUpdateArchitectureWarning, SidebarUpdatePill } from "./SidebarUpdatePill";
 import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 import { observeResize } from "~/lib/observeResize";
+import { isTaskBoardAvailable } from "~/components/tasks/taskBoardStore";
 
 export const SidebarChromeHeader = memo(function SidebarChromeHeader({
   isElectron,
@@ -236,6 +244,7 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   });
   const pullRequestsSupported = usePullRequestsSupported();
   const issuesSupported = useIssuesSupported();
+  const tasksAvailable = isTaskBoardAvailable();
   const closeMobileSidebar = () => {
     if (isMobile) {
       setOpenMobile(false);
@@ -251,6 +260,14 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   const handleIssuesClick = () => {
     closeMobileSidebar();
     void navigate({ to: "/issues", search: readIssueListPreferences() });
+  };
+  const handleTasksClick = () => {
+    closeMobileSidebar();
+    void navigate({ to: "/tasks" });
+  };
+  const handleBrowserTabsClick = () => {
+    closeMobileSidebar();
+    void navigate({ to: "/browser-tabs" });
   };
   const handleSettingsClick = () => {
     closeMobileSidebar();
@@ -301,6 +318,18 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
               onClick={handleIssuesClick}
             />
           ) : null}
+          {tasksAvailable ? (
+            <SidebarUtilityItem
+              icon={<ListTodoIcon />}
+              label={gt("Tasks")}
+              onClick={handleTasksClick}
+            />
+          ) : null}
+          <SidebarUtilityItem
+            icon={<GlobeIcon />}
+            label={gt("Browser tabs")}
+            onClick={handleBrowserTabsClick}
+          />
           <SidebarUtilityItem
             icon={<ChartNoAxesColumnIcon />}
             label={gt("Usage")}

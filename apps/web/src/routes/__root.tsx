@@ -16,6 +16,8 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { APP_DISPLAY_NAME, APP_VERSION } from "../branding";
 import { AppSidebarLayout } from "../components/AppSidebarLayout";
+import { isTasksPopout } from "../components/tasks/tasksPopout";
+import { MusicBars } from "../components/MusicBars";
 import { CommandPalette } from "../components/CommandPalette";
 import { CustomSnoozeDialogHost } from "../components/CustomSnoozeDialog";
 import { GuestShareDialogHost } from "../components/chat/GuestShareControls";
@@ -182,6 +184,15 @@ function RootRouteBranch() {
     return <Outlet />;
   }
 
+  // Fork: the Tasks window is just the Tasks page, without the sidebar or the app's hosts.
+  if (isTasksPopout) {
+    return (
+      <div className="flex h-dvh min-h-0 w-full">
+        <Outlet />
+      </div>
+    );
+  }
+
   // Settings can reopen /welcome mid-session, so it mounts everything the app does except the
   // first-run gate and the event router, whose first navigation would leave the page.
   const appHosts = (
@@ -205,6 +216,7 @@ function RootRouteBranch() {
       <ConnectDeviceApprovalCoordinator />
       <AddProjectToMachineDialogHost />
       <UseInAnotherAppDialogHost />
+      <MusicBars />
       {import.meta.env.DEV && primaryEnvironmentAuthenticated ? <DevReplayHost /> : null}
     </>
   );

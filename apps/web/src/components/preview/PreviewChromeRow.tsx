@@ -6,6 +6,7 @@ import {
   ExternalLink,
   MousePointerClick,
   PictureInPicture2,
+  Pin,
 } from "lucide-react";
 import {
   type FormEvent,
@@ -39,6 +40,9 @@ interface Props {
   onCapture?: ((record: boolean) => void) | undefined;
   captureDisabled?: boolean | undefined;
   recording?: boolean | undefined;
+  /** Fork: pins the tab to its project, so every chat of the project shows it. */
+  onTogglePin?: (() => void) | undefined;
+  pinned?: boolean | undefined;
   onPictureInPicture?: (() => void) | undefined;
   pictureInPicture?: boolean | undefined;
   pictureInPictureDisabled?: boolean | undefined;
@@ -69,6 +73,8 @@ export function PreviewChromeRow({
   onCapture,
   captureDisabled,
   recording,
+  onTogglePin,
+  pinned,
   onPictureInPicture,
   pictureInPicture,
   pictureInPictureDisabled,
@@ -277,6 +283,29 @@ export function PreviewChromeRow({
             </TooltipTrigger>
             <TooltipPopup>
               {recording ? gt("Stop recording") : gt("Screenshot · Shift-click to record")}
+            </TooltipPopup>
+          </Tooltip>
+        ) : null}
+        {onTogglePin ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant={pinned ? "secondary" : "ghost"}
+                  size="icon-xs"
+                  onClick={onTogglePin}
+                  aria-label={pinned ? gt("Unpin from project") : gt("Pin to project")}
+                  aria-pressed={pinned ? "true" : "false"}
+                  type="button"
+                />
+              }
+            >
+              <Pin className={cn(pinned && "text-primary")} />
+            </TooltipTrigger>
+            <TooltipPopup>
+              {pinned
+                ? gt("Unpin from project")
+                : gt("Pin to project: show this tab in every chat of the project")}
             </TooltipPopup>
           </Tooltip>
         ) : null}
