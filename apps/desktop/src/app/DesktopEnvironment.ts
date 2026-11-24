@@ -74,6 +74,8 @@ export class DesktopEnvironment extends Context.Service<
     readonly branding: DesktopAppBranding;
     readonly displayName: string;
     readonly appUserModelId: string;
+    /** Electron profile folder name, so a second packaged build can run beside the official one. */
+    readonly userDataName?: string;
     readonly linuxDesktopEntryName: string;
     readonly linuxApplicationsDir: string;
     readonly desktopLauncherPath: Option.Option<string>;
@@ -230,6 +232,10 @@ const make = Effect.fn("desktop.environment.make")(function* (
     appUserModelId: Option.getOrElse(config.appUserModelIdOverride, () =>
       isDevelopment ? "com.t3tools.t3code.dev" : "com.t3tools.t3code",
     ),
+    ...Option.match(config.userDataNameOverride, {
+      onNone: () => ({}),
+      onSome: (userDataName) => ({ userDataName }),
+    }),
     linuxDesktopEntryName: resolveLinuxDesktopEntryName(isDevelopment),
     linuxApplicationsDir,
     desktopLauncherPath: config.desktopLauncherPath,

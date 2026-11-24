@@ -42,6 +42,19 @@ it.effect.each(["t3code", "T3 Code (Alpha)"])(
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
+it.effect("uses the configured profile name instead of the shared packaged profile", () =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const resolved = yield* resolveUserDataPath({
+      appDataDirectory: "/support",
+      isDevelopment: false,
+      platform: "darwin",
+      userDataName: "t3code-stable",
+    });
+    assert.equal(resolved, path.join("/support", "t3code-stable"));
+  }).pipe(Effect.provide(NodeServices.layer)),
+);
+
 const gpuCacheDirectories = [
   "GPUCache",
   "GrShaderCache",
