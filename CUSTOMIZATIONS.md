@@ -6,6 +6,12 @@ Each entry: date, title, what changed, and why.
 
 ---
 
+## 2026-11-24 — The subagent list above the chat is collapsible and lines up with its header
+
+**What:** Follow-up to the entry below. "Waiting on N subagents" is now a toggle with a chevron: the list starts collapsed, a click expands the rows under it, and the open/closed choice is remembered on the device (localStorage `t3code:thread-now-body-open:v1`). The rows' icons now sit in the line's icon column and the titles start where the line's text does. Rows for delegated tasks, which have no turn item to time them, now show elapsed time from the child thread's current run. Key files: `apps/web/src/components/chat/ThreadNow.tsx`, `BackgroundSubagentRows.tsx`.
+
+**Why:** "Please properly align it." "Can you make this subagents section collapsible... basically this can have a collapsible behavior and I can expand seeing the agents under it."
+
 ## 2026-11-24 — "Waiting on subagents" above the chat lists each subagent like Lineage
 
 **What:** The line above the composer used to read "Waiting on 2 subagents" followed by a comma-separated list of names. It now keeps a short header and shows one row per subagent underneath, built from the same pieces as the Lineage rows in Thread details: provider icon with a status dot, title, elapsed time, the same hover card, and the same click behaviour (opens that thread). Past about four rows the list scrolls. Details only shows when commands are also running, since the rows already show what it did for subagents. Stop stays. No server or websocket changes. Key files: `apps/web/src/components/chat/BackgroundSubagentRows.tsx` (new), `ThreadActivityBanners.tsx`, `ThreadNow.tsx`, `useThreadLifecycle.tsx`.

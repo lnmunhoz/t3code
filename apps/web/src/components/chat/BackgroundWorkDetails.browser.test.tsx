@@ -146,6 +146,9 @@ it("lists a waited-on subagent as a row that opens its thread", async () => {
   await expect
     .element(screen.getByRole("button", { name: "Details", exact: true }))
     .not.toBeInTheDocument();
-  await screen.getByRole("button", { name: "Open Review refactor diffs chat" }).click();
+  const row = screen.getByRole("button", { name: "Open Review refactor diffs chat" });
+  await expect.element(row).not.toBeInTheDocument();
+  await screen.getByRole("button", { name: "Waiting on a subagent" }).click();
+  await row.click();
   expect(onOpenThread).toHaveBeenCalledWith(ThreadId.make("child"), "primary");
 });
