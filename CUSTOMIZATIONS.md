@@ -6,6 +6,12 @@ Each entry: date, title, what changed, and why.
 
 ---
 
+## 2026-11-25 — T3 Dev shows in Cmd+Tab and the Dock
+
+**What:** Dropped `LSUIElement` from `T3 Dev.app`'s Info.plist, left over from when the launcher only opened a Chrome window. The dev Electron binary runs from a bundle whose `CFBundleExecutable` is a shell script, so macOS can't match it to that bundle. When it checks in while the T3 Dev launcher is still waiting for it, it takes over the launcher's app entry, LSUIElement included, and runs as a UI element: no Cmd+Tab, no Dock icon. Without the key it runs as a normal foreground app under the T3 Dev name and icon. Reinstall with `vp run install:mac-launcher`. Key file: `scripts/install-mac-launcher.sh`.
+
+**Why:** T3 Dev didn't show up in Cmd+Tab app switching, which was confusing.
+
 ## 2026-11-24 — T3 Dev opens the Electron desktop app, not a Chrome window
 
 **What:** Replaces the Chrome window from "'T3 Dev' runs this checkout's client against T3 Code Stable's server" below. `~/Applications/T3 Dev.app` now starts this checkout's Electron app in dev mode (`T3CODE_PORT_OFFSET=40 vp run dev:desktop --home-dir ~/.t3/t3-dev`, logging to `~/Library/Logs/t3code-dev.log`) with its own Electron profile (`T3CODE_DESKTOP_USER_DATA_NAME=t3code-t3-dev`, not `t3code-dev`, which plain `vp run dev:desktop` uses) and its local environment turned off (`~/.t3/t3-dev/userdata/desktop-settings.json`), so it never starts a server. On first open it adds T3 Code Stable's server (`http://127.0.0.1:3773`) as a saved backend: it mints a token with `~/.t3/bin/t3 pair` and hands a `t3code-dev://pair` link to the running app, which asks once to confirm the host (marker `~/.t3/t3-dev/userdata/paired-stable`; delete it to pair again). Opening T3 Dev again brings the window forward. It still starts Stable if its server is down. It won't start while another `vp run dev:desktop` runs in this checkout, because the two share the checkout's dev Electron bundle and lock. The dev launcher's fallback environment now carries `T3CODE_DESKTOP_USER_DATA_NAME`, so a relaunch outside the dev runner lands on the same profile. No TypeScript changes: Electron with the local environment off, plus a saved remote backend, is an existing mode. Key files: `scripts/install-mac-launcher.sh`, `apps/desktop/scripts/electron-launcher.mjs`.
