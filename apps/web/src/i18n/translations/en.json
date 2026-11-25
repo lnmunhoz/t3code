@@ -2463,6 +2463,7 @@
   "ae7ca1b255c0177f": "Pending Approval",
   "a28d4938d473c33f": "Awaiting Input",
   "c7c6c2345a741768": "Guest Request",
+  "097bc15b59ba167a": "{count, plural, =1 {Working with a subagent} other {Working with {count} subagents}}",
   "c37d2b47b70c3f7c": "Connecting",
   "04ab29f86a91dd64": "Plan Ready",
   "6fc712c4f5a55ee2": "Could not snooze thread",

@@ -663,6 +663,7 @@ type ThreadStatusInput = Pick<
 > & {
   lastVisitedAt?: string | null | undefined;
   pendingBackgroundTasks?: SidebarThreadSummary["pendingBackgroundTasks"] | undefined;
+  foregroundSubagentCount?: number | undefined;
   blockedOnThreadWait?: boolean | undefined;
 };
 
@@ -1000,13 +1001,17 @@ export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): Si
 }
 
 /**
- * Subagents still running for the thread. The shell lists them only once its own run has
- * settled, so a thread that is still working reads 0 here.
+ * Subagents still running for the thread, foreground or background. The shell counts a live
+ * run's own subagents apart and lists them with its pending work only once that run settles,
+ * so at most one of the two is non-zero.
  */
 export function countPendingSubagents(
-  thread: Pick<ThreadStatusInput, "pendingBackgroundTasks">,
+  thread: Pick<ThreadStatusInput, "pendingBackgroundTasks" | "foregroundSubagentCount">,
 ): number {
-  return (thread.pendingBackgroundTasks ?? []).filter((task) => task.kind === "subagent").length;
+  return (
+    (thread.foregroundSubagentCount ?? 0) +
+    (thread.pendingBackgroundTasks ?? []).filter((task) => task.kind === "subagent").length
+  );
 }
 
 /** Sidebar row status: a failure the user has already opened settles to ready, like Done. */
@@ -1307,12 +1312,19 @@ export function resolveThreadStatusPill(input: {
     };
   }
 
+  const subagents = countPendingSubagents(thread);
   if (
     (thread.runtime?.status === "running" && thread.blockedOnThreadWait !== true) ||
     thread.runtime?.status === "waiting"
   ) {
     return {
-      label: msg("Working"),
+      label:
+        subagents > 0
+          ? msg(
+              "{count, plural, =1 {Working with a subagent} other {Working with {count} subagents}}",
+              { count: subagents },
+            )
+          : msg("Working"),
       colorClass: "text-sky-600 dark:text-sky-300/80",
       dotClass: "bg-sky-500 dark:bg-sky-300/80",
       pulse: true,
@@ -1332,12 +1344,11 @@ export function resolveThreadStatusPill(input: {
     };
   }
 
-  const waitingSubagents = countPendingSubagents(thread);
   const waiting = {
     label:
-      waitingSubagents > 0
+      subagents > 0
         ? msg("{count, plural, =1 {Waiting on a subagent} other {Waiting on {count} subagents}}", {
-            count: waitingSubagents,
+            count: subagents,
           })
         : msg("Waiting"),
     colorClass: "text-sidebar-muted-foreground",

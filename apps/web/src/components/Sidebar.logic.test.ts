@@ -538,6 +538,16 @@ describe("resolveThreadStatusPill", () => {
     expect(m(resolveThreadStatusPill({ thread })!.label)).toBe("Waiting on 2 subagents");
   });
 
+  it("counts the subagents a working thread's own run still waits on", () => {
+    const thread = {
+      ...baseThread,
+      foregroundSubagentCount: 1,
+      runtime: { ...baseThread.runtime, status: "running" },
+    } as const;
+    expect(countPendingSubagents(thread)).toBe(1);
+    expect(m(resolveThreadStatusPill({ thread })!.label)).toBe("Working with a subagent");
+  });
+
   it("shows plan ready when a settled plan turn has a proposed plan ready for follow-up", () => {
     expect(
       resolveThreadStatusPill({

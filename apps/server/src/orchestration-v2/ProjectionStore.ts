@@ -90,6 +90,7 @@ import {
 import { createOrchestrationV2TurnItemVisibility } from "@t3tools/shared/orchestrationV2Timeline";
 import {
   deriveBlockedOnThreadWait,
+  countLiveRunSubagents,
   derivePendingBackgroundWork,
 } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 import * as Context from "effect/Context";
@@ -1925,6 +1926,7 @@ export function threadShellFromProjection(
     runs,
     pullRequests: projection.thread.pullRequests,
   });
+  const foregroundSubagentCount = countLiveRunSubagents({ turnItems: projection.turnItems, runs });
   return {
     createdBy: projection.thread.createdBy,
     creationSource: projection.thread.creationSource,
@@ -1994,6 +1996,7 @@ export function threadShellFromProjection(
       (plan) => plan.kind === "proposed_plan" && plan.status === "active",
     ),
     pendingBackgroundTasks: [...pendingBackgroundTasks],
+    foregroundSubagentCount,
     providerInstanceHistory: providerInstanceHistoryForShell({
       threadId: projection.thread.id,
       providerThreads: projection.providerThreads,
@@ -2141,6 +2144,7 @@ type ShellThreadState = {
   readonly latestUserAuthoredMessageAt: DateTime.Utc | null;
   readonly hasActionableProposedPlan: boolean;
   readonly pendingBackgroundTasks: OrchestrationV2ThreadShell["pendingBackgroundTasks"];
+  readonly foregroundSubagentCount: number;
   readonly providerInstanceHistory: OrchestrationV2ThreadShell["providerInstanceHistory"];
   readonly goal: OrchestrationV2ThreadShell["goal"];
   readonly itemCount: number;
@@ -2316,6 +2320,7 @@ function shellFromState(input: {
     latestUserAuthoredMessageAt: input.state.latestUserAuthoredMessageAt,
     hasActionableProposedPlan: input.state.hasActionableProposedPlan,
     pendingBackgroundTasks: input.state.pendingBackgroundTasks,
+    foregroundSubagentCount: input.state.foregroundSubagentCount,
     providerInstanceHistory: input.state.providerInstanceHistory,
     goal: input.state.goal,
     itemCount: input.state.itemCount,
@@ -9233,6 +9238,10 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
           latestUserAuthoredMessageAt,
           hasActionableProposedPlan: row.has_actionable_proposed_plan === 1,
           pendingBackgroundTasks,
+          foregroundSubagentCount: countLiveRunSubagents({
+            turnItems: pendingTurnItemsByThreadId.get(thread.id) ?? [],
+            hasActiveRun: row.active_run_id !== null,
+          }),
           providerInstanceHistory: providerInstanceHistoryForShell({
             threadId: thread.id,
             providerThreads: providerThreadsByThreadId.get(thread.id) ?? [],

@@ -2463,6 +2463,7 @@
   "ae7ca1b255c0177f": "Aprovação pendente",
   "a28d4938d473c33f": "Aguardando resposta",
   "c7c6c2345a741768": "Pedido de convidado",
+  "097bc15b59ba167a": "{count, plural, =1 {Trabalhando com um subagente} other {Trabalhando com {count} subagentes}}",
   "c37d2b47b70c3f7c": "Conectando",
   "04ab29f86a91dd64": "Plano pronto",
   "6fc712c4f5a55ee2": "Não foi possível adiar a thread",

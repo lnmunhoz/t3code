@@ -2396,6 +2396,8 @@ export const OrchestrationV2ThreadShell = Schema.Struct({
   pendingBackgroundTasks: Schema.optional(Schema.Array(OrchestrationV2PendingBackgroundTask)).pipe(
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
+  /** Subagents the live run still waits on; pendingBackgroundTasks lists them once it settles. Absent from older servers. */
+  foregroundSubagentCount: Schema.optional(NonNegativeInt),
   providerInstanceHistory: Schema.optional(Schema.Array(ProviderInstanceId)).pipe(
     Schema.withDecodingDefault(Effect.succeed([])),
   ),

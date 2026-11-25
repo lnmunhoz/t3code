@@ -2463,6 +2463,7 @@
   "ae7ca1b255c0177f": "Aprobación pendiente",
   "a28d4938d473c33f": "Esperando respuesta",
   "c7c6c2345a741768": "Solicitud de invitado",
+  "097bc15b59ba167a": "{count, plural, =1 {Trabajando con un subagente} other {Trabajando con {count} subagentes}}",
   "c37d2b47b70c3f7c": "Conectando",
   "04ab29f86a91dd64": "Plan listo",
   "6fc712c4f5a55ee2": "No se pudo posponer el hilo",

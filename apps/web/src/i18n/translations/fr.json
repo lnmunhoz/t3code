@@ -2463,6 +2463,7 @@
   "ae7ca1b255c0177f": "Approbation en attente",
   "a28d4938d473c33f": "Réponse attendue",
   "c7c6c2345a741768": "Demande d’invité",
+  "097bc15b59ba167a": "{count, plural, =1 {En cours avec un sous-agent} other {En cours avec {count} sous-agents}}",
   "c37d2b47b70c3f7c": "Connexion",
   "04ab29f86a91dd64": "Plan prêt",
   "6fc712c4f5a55ee2": "Impossible de reporter le fil",

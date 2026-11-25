@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
-import { ProviderInstanceId, ProviderThreadId } from "@t3tools/contracts";
+import { ProviderInstanceId, ProviderThreadId, ThreadId } from "@t3tools/contracts";
 import {
   backgroundWorkHoldsCompletion,
+  countLiveRunSubagents,
   derivePendingBackgroundWork,
+  deriveRunningSubagentTasks,
   monitorHoldsWakeCompletion,
 } from "./orchestrationV2PendingBackgroundWork.ts";
 
@@ -309,6 +311,60 @@ describe("derivePendingBackgroundWork", () => {
         kind: "command",
       },
     ]);
+  });
+});
+
+describe("running subagents", () => {
+  const childA = ThreadId.make("child-a");
+  const turnItems = [
+    {
+      id: "agent-a",
+      type: "subagent",
+      status: "running",
+      title: "Explore",
+      runId: "run-2",
+      nativeItemRef: { nativeId: "task-a" },
+      childThreadId: childA,
+    },
+    // A follow-up message to the same agent.
+    {
+      id: "agent-a-followup",
+      type: "subagent",
+      status: "running",
+      title: "Explore more",
+      runId: "run-2",
+      nativeItemRef: { nativeId: "task-a2" },
+      childThreadId: childA,
+    },
+    {
+      id: "agent-b",
+      type: "subagent",
+      status: "completed",
+      title: "Review",
+      runId: "run-2",
+      childThreadId: ThreadId.make("child-b"),
+    },
+    { id: "cmd", type: "command_execution", status: "running", title: "npm test", runId: "run-2" },
+  ] as const;
+
+  it("lists each subagent still working once, leaving out finished ones and other work", () => {
+    expect(deriveRunningSubagentTasks({ turnItems })).toEqual([
+      { taskId: "task-a", description: "Explore", kind: "subagent", childThreadId: childA },
+    ]);
+  });
+
+  it("counts a live run's subagents, which the pending list leaves out until it settles", () => {
+    const live = { id: "run-2" as never, ordinal: 2, status: "running" } as const;
+    expect(
+      derivePendingBackgroundWork({
+        latestRun: live,
+        providerThreads: [],
+        turnItems,
+        runs: [live],
+      }),
+    ).toEqual([]);
+    expect(countLiveRunSubagents({ turnItems, runs: [live] })).toBe(1);
+    expect(countLiveRunSubagents({ turnItems, runs: [{ ...live, status: "completed" }] })).toBe(0);
   });
 });
 

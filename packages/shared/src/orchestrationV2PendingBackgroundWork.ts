@@ -258,6 +258,53 @@ export function pendingBackgroundTurnItems<Item extends PendingBackgroundWorkTur
   );
 }
 
+function resolveHasActiveRun(input: {
+  readonly hasActiveRun?: boolean | undefined;
+  readonly runs?: ReadonlyArray<PendingBackgroundWorkRun> | undefined;
+}): boolean {
+  return (
+    input.hasActiveRun ??
+    input.runs?.some(
+      (run) => run.status === "preparing" || run.status === "starting" || run.status === "running",
+    ) ??
+    false
+  );
+}
+
+// Follow-up tasks can share a child thread; the pending list counts agents, not messages.
+function distinctAgents(
+  tasks: Iterable<PendingBackgroundWorkTask>,
+): ReadonlyArray<PendingBackgroundWorkTask> {
+  const childThreadIds = new Set<ThreadId>();
+  return Array.from(tasks).filter((task) => {
+    if (task.kind !== "subagent" || task.childThreadId == null) return true;
+    if (childThreadIds.has(task.childThreadId)) return false;
+    childThreadIds.add(task.childThreadId);
+    return true;
+  });
+}
+
+/** Subagents still working, foreground or background, whatever state their run is in. */
+export function deriveRunningSubagentTasks(input: {
+  readonly turnItems: ReadonlyArray<PendingBackgroundWorkTurnItem>;
+  readonly runs?: ReadonlyArray<PendingBackgroundWorkRun>;
+}): ReadonlyArray<PendingBackgroundWorkTask> {
+  return distinctAgents(
+    pendingBackgroundTurnItems(input)
+      .filter((item) => item.type === "subagent")
+      .map((item) => pendingTaskFromTurnItem(nativeTaskIdFromTurnItem(item), item)),
+  );
+}
+
+/** Subagents still working while the thread's own run is live, when the pending list is empty. */
+export function countLiveRunSubagents(input: {
+  readonly turnItems: ReadonlyArray<PendingBackgroundWorkTurnItem>;
+  readonly hasActiveRun?: boolean;
+  readonly runs?: ReadonlyArray<PendingBackgroundWorkRun>;
+}): number {
+  return resolveHasActiveRun(input) ? deriveRunningSubagentTasks(input).length : 0;
+}
+
 export function derivePendingBackgroundWork(input: {
   readonly latestRun: PendingBackgroundWorkRun | null | undefined;
   readonly providerThreads: ReadonlyArray<PendingBackgroundWorkProviderThread>;
@@ -268,13 +315,7 @@ export function derivePendingBackgroundWork(input: {
   readonly runs?: ReadonlyArray<PendingBackgroundWorkRun>;
   readonly pullRequests?: ReadonlyArray<PendingBackgroundWorkPullRequest> | undefined;
 }): ReadonlyArray<PendingBackgroundWorkTask> {
-  const hasActiveRun =
-    input.hasActiveRun ??
-    input.runs?.some(
-      (run) => run.status === "preparing" || run.status === "starting" || run.status === "running",
-    ) ??
-    false;
-  if (hasActiveRun) {
+  if (resolveHasActiveRun(input)) {
     return [];
   }
   if (input.latestRun == null) {
@@ -319,14 +360,7 @@ export function derivePendingBackgroundWork(input: {
 
   for (const task of pullRequestWatchTasks(input.pullRequests)) byTaskId.set(task.taskId, task);
 
-  // Follow-up tasks can share a child thread; the pending list counts agents, not messages.
-  const childThreadIds = new Set<ThreadId>();
-  return Array.from(byTaskId.values()).filter((task) => {
-    if (task.kind !== "subagent" || task.childThreadId == null) return true;
-    if (childThreadIds.has(task.childThreadId)) return false;
-    childThreadIds.add(task.childThreadId);
-    return true;
-  });
+  return distinctAgents(byTaskId.values());
 }
 
 function pullRequestWatchTasks(

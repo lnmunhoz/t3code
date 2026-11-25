@@ -795,7 +795,12 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               ? gt("Setting up")
               : thread.goal?.status === "active"
                 ? gt("Goal", { $context: "thread status: working on a goal" })
-                : gt("Working", { $context: "thread status" }),
+                : subagentCount > 0
+                  ? gt(
+                      "{count, plural, =1 {Working with a subagent} other {Working with {count} subagents}}",
+                      { count: subagentCount },
+                    )
+                  : gt("Working", { $context: "thread status" }),
           icon: "working" as const,
           className: "text-info-foreground",
         }
@@ -1495,7 +1500,11 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                       >
                         <TopStatusIcon icon={topStatus.icon} className="size-3" />
                         {/* Folder rows are narrow; the meta line's badge carries the count. */}
-                        {waitingOnSubagents ? gt("Subagents") : topStatus.label}
+                        {waitingOnSubagents
+                          ? gt("Subagents")
+                          : status === "working" && subagentCount > 0
+                            ? gt("Working", { $context: "thread status" })
+                            : topStatus.label}
                       </span>
                     ) : (
                       <span className="text-xs">

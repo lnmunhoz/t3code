@@ -1571,8 +1571,9 @@ describe("deriveThreadPendingBackgroundTasks", () => {
     },
   );
 
-  it("does not list a live run's child from the provider roster as background", () => {
+  it("lists a live run's running subagents once beside the background ones, without finished ones", () => {
     // The roster is not run-tied; Muse keys it by the child session id its rows carry.
+    const sharedChild = ThreadId.make("child-thread-shared");
     expect(
       deriveThreadPendingBackgroundTasks(
         projection({
@@ -1588,8 +1589,19 @@ describe("deriveThreadPendingBackgroundTasks", () => {
             },
           ],
           turnItems: [
-            { ...item(1, "subagent", "child-session-1", ""), prompt: "child 1" },
+            {
+              ...item(1, "subagent", "child-session-1", ""),
+              prompt: "child 1",
+              childThreadId: sharedChild,
+            },
             { ...item(2, "subagent", "child-session-2", ""), prompt: "child 2" },
+            // A follow-up message to the background subagent's thread.
+            {
+              ...item(2, "subagent", "child-session-1b", ""),
+              prompt: "child 1 again",
+              childThreadId: sharedChild,
+            },
+            { ...item(2, "subagent", "child-session-3", ""), prompt: "done", status: "completed" },
           ],
         }),
       ),
@@ -1599,6 +1611,7 @@ describe("deriveThreadPendingBackgroundTasks", () => {
         kind: "subagent",
         providerInstanceId: base.thread.providerInstanceId,
       },
+      { taskId: "child-session-2", description: "child 2", kind: "subagent" },
     ]);
   });
 
