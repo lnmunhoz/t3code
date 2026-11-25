@@ -6,6 +6,12 @@ Each entry: date, title, what changed, and why.
 
 ---
 
+## 2026-11-25 — T3 Dev's "Open in" editor button opens files locally
+
+**What:** Before it starts the app, the T3 Dev launcher now links Stable's `~/.t3/userdata/environment-id` into `~/.t3/t3-dev/userdata/environment-id`. The desktop app reads that file to learn which environment is "this computer" (`apps/desktop/src/ipc/methods/localEnvironment.ts`). T3 Dev never runs its own server, so the file was missing. That made the client treat Stable's server, a saved backend at `127.0.0.1:3773`, as a remote machine, and `resolveRemoteOpenState` (`apps/web/src/remoteOpen.ts`) found no SSH route to it. No TypeScript changes. The proper fix would be for the client to count a saved backend at a localhost address in the desktop app as this computer; I chose this launcher-only fix instead. Reinstall with `vp run install:mac-launcher`. Key file: `scripts/install-mac-launcher.sh`.
+
+**Why:** "Open in Cursor" was disabled in T3 Dev and showed "No SSH route to Lucas's MacBook Pro", even though everything runs on this Mac.
+
 ## 2026-11-25 — T3 Dev shows in Cmd+Tab and the Dock
 
 **What:** Dropped `LSUIElement` from `T3 Dev.app`'s Info.plist, left over from when the launcher only opened a Chrome window. The dev Electron binary runs from a bundle whose `CFBundleExecutable` is a shell script, so macOS can't match it to that bundle. When it checks in while the T3 Dev launcher is still waiting for it, it takes over the launcher's app entry, LSUIElement included, and runs as a UI element: no Cmd+Tab, no Dock icon. Without the key it runs as a normal foreground app under the T3 Dev name and icon. Reinstall with `vp run install:mac-launcher`. Key file: `scripts/install-mac-launcher.sh`.

@@ -69,6 +69,8 @@ if ! { alive "\$runner" && ps -o command= -p "\$runner" | grep -q 'dev:desktop';
   fi
   # No local backend: this app must never start a server, and Stable owns ~/.t3/userdata.
   [[ -f "\$STATE/desktop-settings.json" ]] || echo '{"localEnvironmentEnabled":false}' >"\$STATE/desktop-settings.json"
+  # Stable's server runs on this Mac: sharing its id lets the client open files locally, not over SSH.
+  ln -sfn "\$HOME/.t3/userdata/environment-id" "\$STATE/environment-id"
   cd "\$REPO"
   echo "=== \$(date) starting dev:desktop ===" >>"\$LOG"
   T3CODE_PORT_OFFSET=40 nohup "\$REPO/node_modules/.bin/vp" run dev:desktop --home-dir "\$T3_DEV_HOME" >>"\$LOG" 2>&1 &
