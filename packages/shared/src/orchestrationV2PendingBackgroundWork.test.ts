@@ -4,7 +4,6 @@ import {
   backgroundWorkHoldsCompletion,
   countLiveRunSubagents,
   derivePendingBackgroundWork,
-  deriveRunningSubagentTasks,
   monitorHoldsWakeCompletion,
 } from "./orchestrationV2PendingBackgroundWork.ts";
 
@@ -347,13 +346,7 @@ describe("running subagents", () => {
     { id: "cmd", type: "command_execution", status: "running", title: "npm test", runId: "run-2" },
   ] as const;
 
-  it("lists each subagent still working once, leaving out finished ones and other work", () => {
-    expect(deriveRunningSubagentTasks({ turnItems })).toEqual([
-      { taskId: "task-a", description: "Explore", kind: "subagent", childThreadId: childA },
-    ]);
-  });
-
-  it("counts a live run's subagents, which the pending list leaves out until it settles", () => {
+  it("counts a live run's working subagents once each, which the pending list leaves out", () => {
     const live = { id: "run-2" as never, ordinal: 2, status: "running" } as const;
     expect(
       derivePendingBackgroundWork({

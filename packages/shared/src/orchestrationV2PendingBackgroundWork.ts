@@ -284,8 +284,7 @@ function distinctAgents(
   });
 }
 
-/** Subagents still working, foreground or background, whatever state their run is in. */
-export function deriveRunningSubagentTasks(input: {
+function deriveRunningSubagentTasks(input: {
   readonly turnItems: ReadonlyArray<PendingBackgroundWorkTurnItem>;
   readonly runs?: ReadonlyArray<PendingBackgroundWorkRun>;
 }): ReadonlyArray<PendingBackgroundWorkTask> {

@@ -8,10 +8,7 @@ import {
 } from "@t3tools/client-runtime/state/thread-execution";
 import { turnChanges } from "@t3tools/client-runtime/state/thread-repositories";
 import { COMPACT_COMMAND_PATTERN } from "@t3tools/client-runtime/state/context-window";
-import {
-  derivePendingBackgroundWork,
-  deriveRunningSubagentTasks,
-} from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
+import { derivePendingBackgroundWork } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 import {
   latestUnheldRun,
   usageLimitRunPresentedAsLatest,
@@ -1633,8 +1630,10 @@ export function presentThreadShellFromProjection(
 const LIVE_RUN_STATUSES = new Set(["queued", "preparing", "starting", "running"]);
 
 /**
- * Earlier runs' background work, then the subagents a live run still waits on; the live run's
- * other items stay out. The roster is not run-tied, so entries naming a live run's item drop.
+ * Background work the provider still runs after an earlier run ended. It
+ * stays listed while a later run is live; that live run's own items are its
+ * foreground work, so they never count as background. The provider roster is
+ * not run-tied, so it drops entries naming a live run's item by native id.
  */
 export function deriveThreadPendingBackgroundTasks(projection: ThreadStructure | null) {
   if (projection === null) return [];
@@ -1653,47 +1652,24 @@ export function deriveThreadPendingBackgroundTasks(projection: ThreadStructure |
   const latestRun =
     usageLimitRunPresentedAsLatest(projection.runs, projection.turnItems, sessionError) ??
     latestUnheldRun(projection.runs.filter((run) => !liveRunIds.has(run.id)));
-  const background = derivePendingBackgroundWork({
-    latestRun,
-    providerThreads: projection.providerThreads.map((thread) => ({
-      ...thread,
-      pendingBackgroundTasks: thread.pendingBackgroundTasks?.filter(
-        (task) => !foregroundTaskIds.has(task.taskId),
+  return [
+    ...derivePendingBackgroundWork({
+      latestRun,
+      providerThreads: projection.providerThreads.map((thread) => ({
+        ...thread,
+        pendingBackgroundTasks: thread.pendingBackgroundTasks?.filter(
+          (task) => !foregroundTaskIds.has(task.taskId),
+        ),
+      })),
+      turnItems: projection.turnItems.filter(
+        (item) => item.runId === null || !liveRunIds.has(item.runId),
       ),
-    })),
-    turnItems: projection.turnItems.filter(
-      (item) => item.runId === null || !liveRunIds.has(item.runId),
-    ),
-    activeProviderThreadId: projection.thread.activeProviderThreadId,
-    hasActiveRun: false,
-    runs: projection.runs,
-    pullRequests: projection.thread.pullRequests,
-  });
-  // Roster tasks carry no child thread; their turn item does.
-  const subagentChildByKey = new Map<string, ThreadId>();
-  for (const item of projection.turnItems) {
-    if (item.type !== "subagent" || item.childThreadId === null) continue;
-    subagentChildByKey.set(item.nativeItemRef?.nativeId || item.id, item.childThreadId);
-  }
-  const listedChildIds = new Set<ThreadId>();
-  for (const task of background) {
-    if (task.kind !== "subagent") continue;
-    const childThreadId =
-      task.childThreadId ?? subagentChildByKey.get(task.nativeItemId ?? task.taskId);
-    if (childThreadId !== undefined) listedChildIds.add(childThreadId);
-  }
-  const foreground = deriveRunningSubagentTasks({
-    turnItems: projection.turnItems.filter(
-      (item) => item.runId !== null && liveRunIds.has(item.runId),
-    ),
-    runs: projection.runs,
-  }).filter(
-    (task) =>
-      task.kind !== "subagent" ||
-      task.childThreadId === undefined ||
-      !listedChildIds.has(task.childThreadId),
-  );
-  return [...background, ...foreground];
+      activeProviderThreadId: projection.thread.activeProviderThreadId,
+      hasActiveRun: false,
+      runs: projection.runs,
+      pullRequests: projection.thread.pullRequests,
+    }),
+  ];
 }
 
 /**
